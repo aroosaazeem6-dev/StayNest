@@ -1,0 +1,12 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "extensions": ["js", "json", "ts"],
+  "flat": false,
+  "compiler": {
+    "deleteOutDir": true,
+    "webpack": false,
+    "tsConfigPath": "tsconfig.json",
+    "webpackConfig": false
+  }
+}

@@ -1,0 +1,19 @@
+﻿# =============================================================================
+# CI/CD — This file is a placeholder for future workflows.
+# =============================================================================
+# GitHub Actions workflows will be added in Phase 15 (CI/CD).
+# 
+# Planned workflows:
+# - lint.yml: Run ESLint and TypeScript type checking
+# - test.yml: Run unit and e2e tests
+# - security.yml: Run Trivy vulnerability scanner
+#
+name: Placeholder
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs: {}

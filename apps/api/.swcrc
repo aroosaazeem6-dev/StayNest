@@ -1,0 +1,4 @@
+﻿module.exports = {
+  jwttotalImports: true,
+  tsconfig: 'tsconfig.json',
+};

@@ -1,0 +1,24 @@
+{
+  "name": "staynest",
+  "private": true,
+  "version": "0.1.0",
+  "description": "StayNest - Full-Stack Vacation Rental Marketplace (Phase 0: Project Foundation)",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "npm run dev --workspace=staynest-web",
+    "dev:api": "npm run dev --workspace=staynest-api",
+    "build": "npm run build --workspaces",
+    "build:web": "npm run build --workspace=staynest-web",
+    "build:api": "npm run build --workspace=staynest-api",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED"
+}
