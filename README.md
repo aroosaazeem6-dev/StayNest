@@ -1,8 +1,8 @@
-﻿# StayNest
+# StayNest
 
 **Full-Stack Vacation Rental Marketplace**
 
-> Phase 0 - Project Foundation | Status: **In Progress**
+> Phase 1 — Database + Docker &nbsp;|&nbsp; Status: **In Progress**
 
 StayNest is a full-stack vacation rental marketplace built as a professional portfolio project. It demonstrates modern web (Next.js), mobile (Flutter), and backend (NestJS) engineering on a modular monolith architecture with PostgreSQL, Redis, MinIO, Docker, Kubernetes, and CI/CD.
 
@@ -10,15 +10,22 @@ StayNest is a full-stack vacation rental marketplace built as a professional por
 
 ## Current Status
 
-**Phase 0: Project Foundation** (in progress)
+**Phase 1: Database + Docker** (in progress)
 
-- [x] Monorepo structure established (npm workspaces)
-- [x] NestJS backend foundation (`apps/api`)
-- [x] Next.js web foundation (`apps/web`)
-- [x] Mobile placeholder (`apps/mobile`)
-- [x] Infrastructure skeleton (Docker, Kubernetes, Terraform)
-- [x] Documentation skeleton
-- [x] Root workspace configuration
+- [x] PostgreSQL development environment (Docker)
+- [x] Redis development environment (Docker)
+- [x] MinIO development environment (Docker)
+- [x] Docker Compose configuration
+- [x] PostgreSQL database schema (Prisma)
+- [x] Database migrations
+- [x] Development seed data
+- [x] NestJS database integration (Prisma)
+- [x] Basic database health verification
+- [x] Redis connectivity verification
+- [x] MinIO connectivity verification
+- [x] Documentation of infrastructure start/stop
+
+**Phase 0: Project Foundation** — complete.
 
 Planned phases are listed in the [Development Roadmap](#development-roadmap).
 
@@ -35,21 +42,22 @@ Planned phases are listed in the [Development Roadmap](#development-roadmap).
 ### Backend
 - **NestJS** + Node.js + TypeScript (modular monolith)
 - **REST API**
+- **Prisma ORM** (PostgreSQL data layer)
 
 ### Database & Infrastructure
-- **PostgreSQL** (primary database)
-- **Redis** (cache)
-- **MinIO** (object storage / S3-compatible)
+- **PostgreSQL** 17 (database)
+- **Redis** 7 (cache)
+- **MinIO** (S3-compatible object storage)
 - **Docker** + Docker Compose
-- **Kubernetes** (Minikube/Kind for local dev)
-- **Terraform** (infrastructure as code)
-- **GitHub Actions** (CI/CD)
-- **SonarQube** (code quality)
-- **Trivy** + OWASP Dependency-Check (security)
+- **Kubernetes** (Minikube/Kind — planned for Phase 13)
+- **Terraform** (IaC — planned for Phase 16)
+- **GitHub Actions** (CI/CD — planned for Phase 15)
+- **SonarQube** (code quality — planned for Phase 14)
+- **Trivy** + OWASP Dependency-Check (security — planned for Phase 14)
 
 ### Third-Party Services
-- **Stripe** (test mode only)
-- **JWT** (authentication)
+- **Stripe** (test mode only — Phase 6)
+- **JWT** (authentication — Phase 3)
 
 ---
 
@@ -65,29 +73,29 @@ Planned phases are listed in the [Development Roadmap](#development-roadmap).
 
 ## Development Roadmap
 
-| Phase | Description                                           | Status   |
-|-------|-------------------------------------------------------|----------|
-| 0     | Project Foundation                                    | In Progress |
-| 1     | Database + Docker (PostgreSQL, Redis, Docker Compose) | Planned  |
-| 2     | NestJS Backend Foundation (modular structure, config, health checks) | Planned  |
-| 3     | Authentication + RBAC (JWT, role-based guards)        | Planned  |
-| 4     | Property / Listing Service                            | Planned  |
-| 5     | Booking Service                                       | Planned  |
-| 6     | Payment Service (Stripe test mode)                    | Planned  |
-| 7     | Reviews + Favorites                                   | Planned  |
-| 8     | MinIO / Image Storage                                 | Planned  |
-| 9     | Admin Service                                         | Planned  |
-| 10    | Next.js Web Application (full marketplace UI)         | Planned  |
-| 11    | Flutter Mobile Application                            | Planned  |
-| 12    | Dockerization + Docker Compose                        | Planned  |
-| 13    | Kubernetes - Minikube / Kind                            | Planned  |
-| 14    | Testing + Security (Trivy, OWASP)                     | Planned  |
-| 15    | GitHub Actions CI/CD                                  | Planned  |
-| 16    | Terraform / Infrastructure as Code                    | Planned  |
-| 17    | Final Deployment                                      | Planned  |
-| 18    | Documentation + Portfolio                             | Planned  |
+| Phase | Description                                                  | Status    |
+|-------|--------------------------------------------------------------|-----------|
+| 0     | Project Foundation                                           | Complete  |
+| 1     | Database + Docker (PostgreSQL, Redis, MinIO, Docker Compose) | In Progress |
+| 2     | NestJS Backend Foundation (modular structure, config)        | Planned  |
+| 3     | Authentication + RBAC (JWT, role-based guards)               | Planned  |
+| 4     | Property / Listing Service                                   | Planned  |
+| 5     | Booking Service                                              | Planned  |
+| 6     | Payment Service (Stripe test mode)                           | Planned  |
+| 7     | Reviews + Favorites                                          | Planned  |
+| 8     | MinIO / Image Storage                                        | Planned  |
+| 9     | Admin Service                                                | Planned  |
+| 10    | Next.js Web Application (full marketplace UI)                | Planned  |
+| 11    | Flutter Mobile Application                                   | Planned  |
+| 12    | Dockerization + Docker Compose                              | Planned  |
+| 13    | Kubernetes - Minikube / Kind                                 | Planned  |
+| 14    | Testing + Security (Trivy, OWASP)                            | Planned  |
+| 15    | GitHub Actions CI/CD                                         | Planned  |
+| 16    | Terraform / Infrastructure as Code                           | Planned  |
+| 17    | Final Deployment                                             | Planned  |
+| 18    | Documentation + Portfolio                                    | Planned  |
 
-> Features listed under future plan are **not yet implemented**.
+> Features listed under future phases are **not yet implemented**.
 
 ---
 
@@ -96,9 +104,9 @@ Planned phases are listed in the [Development Roadmap](#development-roadmap).
 ### Required
 - Node.js v20+ and npm v10+
 - Git
+- Docker Desktop
 
 ### Installed During Later Phases
-- Docker + Docker Compose
 - kubectl
 - Minikube or Kind
 - Terraform
@@ -107,47 +115,92 @@ Planned phases are listed in the [Development Roadmap](#development-roadmap).
 
 ---
 
+## Quick Start
+
+### Start Infrastructure
+
+```bash
+# From the project root
+docker compose up -d
+
+# Verify services
+docker compose ps
+```
+
+### Apply Database Migrations
+
+```bash
+cd apps/api
+npx prisma migrate dev --name init
+```
+
+### Seed Development Data
+
+```bash
+cd apps/api
+npx prisma db seed
+```
+
+### Start the API
+
+```bash
+npm run dev:api
+```
+
+### Verify Health
+
+```bash
+npm run dev:web
+```
+
+Open http://localhost:3000 for the web app, or http://localhost:3000/health for the API health check.
+
+### Stop Everything
+
+```bash
+docker compose down -v   # stop + remove volumes (data loss)
+docker compose down      # stop + keep data
+```
+
+See [docs/operations.md](docs/operations.md) for detailed instructions.
+
+---
+
 ## Project Structure
 
 ```
 staynest/
 ├── apps/
-│   ├── api/          # NestJS backend (modular monolith)
+│   ├── api/
+│   │   ├── prisma/        # Prisma schema, migrations, seed
+│   │   ├── src/
+│   │   │   ├── config/    # Env validation, configuration
+│   │   │   ├── health/    # Health check endpoint
+│   │   │   ├── minio/     # MinIO (S3-compatible storage) service
+│   │   │   ├── prisma/    # Prisma client service + module
+│   │   │   ├── redis/     # Redis service + module
+│   │   │   └── main.ts    # NestJS bootstrap
+│   │   └── prisma.config.ts
 │   ├── web/          # Next.js web application
 │   └── mobile/       # Flutter mobile app (initialized in Phase 11)
 ├── infrastructure/
-│   ├── docker/       # Dockerfiles, docker-compose
-│   ├── kubernetes/   # Helm charts, k8s manifests
-│   └── terraform/    # IaC configurations
-├── docs/             # Architecture and design docs
+│   ├── docker/
+│   │   └── Dockerfile.api  # NestJS app Dockerfile (skeleton)
+│   ├── kubernetes/
+│   └── terraform/
+├── docs/
+│   ├── architecture.md
+│   └── operations.md
 ├── tests/
-│   └── e2e/          # End-to-end tests
+│   └── e2e/
 ├── .github/
-│   └── workflows/    # GitHub Actions CI/CD
+│   └── workflows/
 ├── .env.example
 ├── .gitignore
-├── package.json      # Root workspace manifest
+├── docker-compose.yml   # Development infrastructure (PostgreSQL, Redis, MinIO)
+├── package.json         # Root workspace manifest
 ├── README.md
-└── AGENTS.md         # Coding conventions for AI agents
-```
-
----
-
-## Getting Started
-
-```bash
-# Clone and enter directory
-git clone <repo-url>
-cd staynest
-
-# Install all workspace dependencies
-npm install
-
-# Start the web app (development)
-npm run dev:web
-
-# Start the API (development)
-npm run dev:api
+└── AGENTS.md
 ```
 
 ---
@@ -162,7 +215,7 @@ This project is a **portfolio/demo only**. It requires **no paid services**:
 - No paid storage services
 - Stripe remains **test mode only** — no real payment processing
 
-All services run locally via Docker Compose or Minikube/Kind.
+All services run locally via Docker Compose.
 
 ---
 

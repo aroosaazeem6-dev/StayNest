@@ -16,7 +16,9 @@ export default () => ({
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
   },
   minio: {
-    endpoint: process.env.MINIO_ENDPOINT,
+    endpoint: process.env.MINIO_ENDPOINT ?? 'http://localhost:9000',
+    port: parseInt(process.env.MINIO_PORT ?? '9000', 10),
+    useSSL: false,
     accessKey: process.env.MINIO_ACCESS_KEY,
     secretKey: process.env.MINIO_SECRET_KEY,
     bucket: process.env.MINIO_BUCKET ?? 'staynest',

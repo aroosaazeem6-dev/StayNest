@@ -16,7 +16,10 @@
     "build:api": "npm run build --workspace=staynest-api",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces",
+    "compose:up": "docker compose up -d",
+    "compose:down": "docker compose down -v",
+    "compose:ps": "docker compose ps"
   },
   "keywords": [],
   "author": "",
