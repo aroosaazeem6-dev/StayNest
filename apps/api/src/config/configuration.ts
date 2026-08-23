@@ -23,4 +23,10 @@ export default () => ({
     secretKey: process.env.MINIO_SECRET_KEY,
     bucket: process.env.MINIO_BUCKET ?? 'staynest',
   },
+  cors: {
+    origin: process.env.CORS_ORIGIN ?? '*',
+  },
+  api: {
+    prefix: process.env.API_PREFIX ?? 'api/v1',
+  },
 });

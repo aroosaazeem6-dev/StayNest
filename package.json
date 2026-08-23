@@ -7,6 +7,9 @@
     "apps/api",
     "apps/web"
   ],
+  "overrides": {
+    "rxjs": "7.8.2"
+  },
   "scripts": {
     "dev": "npm run dev:web",
     "dev:web": "npm run dev --workspace=staynest-web",

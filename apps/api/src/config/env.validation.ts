@@ -20,4 +20,6 @@ export const envValidationSchema = Joi.object({
   SMTP_PORT: Joi.number().optional(),
   SMTP_USER: Joi.string().allow('').optional(),
   SMTP_PASS: Joi.string().allow('').optional(),
+  CORS_ORIGIN: Joi.string().default('*'),
+  API_PREFIX: Joi.string().default('api/v1'),
 });

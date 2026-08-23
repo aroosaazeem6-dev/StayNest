@@ -1,11 +1,35 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
 
+  const configService = app.get(ConfigService);
+
+  // Security: Helmet for HTTP headers
+  app.use(helmet());
+
+  // CORS: configurable via environment
+  const corsOrigin = configService.get<string>('cors.origin');
+  app.enableCors({
+    origin: corsOrigin?.split(',') ?? '*',
+    credentials: true,
+  });
+
+  // API Versioning: URI-based (e.g., /api/v1/...)
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+    prefix: 'api/v',
+  });
+
+  // Global Validation Pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -17,21 +41,26 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  app.enableCors();
+  // Graceful Shutdown
+  app.enableShutdownHooks();
 
-  const config = new DocumentBuilder()
+  // Swagger / OpenAPI
+  const docsConfig = new DocumentBuilder()
     .setTitle('StayNest API')
-    .setDescription('StayNest REST API - Phase 0: Project Foundation')
-    .setVersion('0.1.0')
+    .setDescription('StayNest REST API - Backend Foundation (Phase 2)')
+    .setVersion('2.0')
+    .addServer('/api/v1', 'v1')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, docsConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT ?? 3000;
+  const port = configService.get<number>('port') ?? 3000;
   await app.listen(port);
-  console.log(`StayNest API is running on: http://localhost:${port}`);
-  console.log(`API docs available at: http://localhost:${port}/api/docs`);
+
+  console.log(`StayNest API running on http://localhost:${port}`);
+  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  console.log(`Health: http://localhost:${port}/health`);
 }
 
 bootstrap().catch((err) => {

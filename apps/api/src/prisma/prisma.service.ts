@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { ConfigService } from '@nestjs/config';
@@ -10,7 +10,7 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(configService: ConfigService) {
+  constructor(@Inject(ConfigService) configService: ConfigService) {
     const databaseUrl = configService.get<string>('database.url');
     super({
       adapter: new PrismaPg({ connectionString: databaseUrl }),

@@ -62,19 +62,82 @@ Prisma 7 with the `@prisma/adapter-pg` driver adapter for direct PostgreSQL conn
 - **PrismaModule** (global) — wraps `PrismaService` (extends `PrismaClient` with `PrismaPg` adapter)
 - **RedisModule** (global) — wraps `RedisService` (node-redis v4 client)
 - **MinioModule** (global) — wraps `MinioService` (minio SDK, auto-creates bucket)
-- **HealthModule** — `GET /health` endpoint with database, Redis, and MinIO connectivity checks
+- **HealthModule** — `GET /api/v1/health` endpoint with database, Redis, and MinIO connectivity checks
+
+### Phase 2: Application Layer
+
+#### Module Structure
+
+```
+apps/api/src/
+├── app.module.ts          # Root module
+├── main.ts                # Bootstrap (Helmet, CORS, Versioning, Swagger)
+├── config/
+│   ├── configuration.ts   # Parsed configuration object
+│   └── env.validation.ts  # Joi schema for env vars
+├── common/
+│   ├── common.module.ts   # Global error filter + response interceptor + logging
+│   ├── filters/
+│   │   ├── all-exceptions.filter.ts       # Consistent JSON error format
+│   │   └── all-exceptions.filter.spec.ts  # Unit tests
+│   ├── interceptors/
+│   │   ├── response.interceptor.ts        # Success response wrapper { success, data, timestamp }
+│   │   └── logging.interceptor.ts         # Request/response timing + status logging
+│   └── index.ts           # Barrel exports
+├── health/                # Health check endpoints
+│   ├── health.controller.ts  # /health, /health/live, /health/ready
+│   └── health.module.ts
+├── prisma/
+│   ├── prisma.service.ts     # PrismaClient with PrismaPg adapter + @Inject(ConfigService)
+│   ├── prisma.module.ts       # Global module
+├── redis/
+│   ├── redis.service.ts      # node-redis v4 client
+│   ├── redis.module.ts
+├── minio/
+│   ├── minio.service.ts      # MinIO SDK client, auto-bucket creation
+│   ├── minio.module.ts
+```
+
+#### Key Features
+
+- **Global Error Filter**: `@Catch()` filter formats all errors as `{ success: false, error: { code, message, details? }, timestamp, path }`
+- **Response Interceptor**: Wraps successful responses as `{ success: true, data, timestamp }`
+- **Logging Interceptor**: Logs HTTP method, URL, status code, and duration
+- **API Versioning**: URI-based (`/api/v1/...`) with `defaultVersion: '1'` and `prefix: 'api/v'`
+- **Health Endpoints**:
+  - `GET /api/v1/health` — full health check (database, redis, minio)
+  - `GET /api/v1/health/live` — liveness probe (always 200)
+  - `GET /api/v1/health/ready` — readiness probe (checks all dependencies)
+- **Security**: Helmet middleware for HTTP hardening; CORS configurable via `CORS_ORIGIN` env var
+- **Graceful Shutdown**: `app.enableShutdownHooks()` for clean service teardown on SIGINT/SIGTERM
+- **Rate Limiting**: (reserved for Phase 2)
+- **Swagger/OpenAPI**: Auto-generated docs at `/api/docs` with server configured for `/api/v1`
+- **Validation**: Global `ValidationPipe` with `whitelist`, `transform`, `forbidNonWhitelisted`
+
+#### Environment Variables (Phase 2 additions)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | 3000 | Application port |
+| `CORS_ORIGIN` | `*` | Comma-separated allowed origins |
+| `API_PREFIX` | `api/v1` | API version prefix (reserved for future use) |
+
+#### Testing
+
+- **Unit Tests**: `npm run test:unit` — tests in `src/**/*.spec.ts`
+- **E2E Tests**: `npm run test:e2e` — tests in `test/*.e2e-spec.ts` with mocked infrastructure services
 
 ### Development Workflow
 
-1. `docker compose up -d` — start infrastructure
+1. `docker compose up -d` — start infrastructure (PostgreSQL, Redis, MinIO)
 2. `npx prisma migrate dev --name <name>` — create and apply migrations
 3. `npx prisma db seed` — seed development data
 4. `npm run dev:api` — start NestJS in watch mode
-5. `curl http://localhost:3000/health` — verify health
+5. `curl http://localhost:3000/api/v1/health` — verify health
 
 ### Future Phases
 
-- Phase 2: NestJS modular structure (Auth, Users, Properties, Bookings, Payments, etc.)
+- Phase 2 (Partial): User, Property, Booking, Payment, Auth, File Upload domains (reserved for future implementation)
 - Phase 3: JWT authentication and RBAC guards
 - Phase 8: Image upload via MinIO
 - Phase 12: Full Dockerization of the NestJS app

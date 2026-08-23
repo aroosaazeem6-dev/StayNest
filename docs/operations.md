@@ -9,8 +9,6 @@
 | Docker Desktop | 4.x |
 | Docker Compose | v2.x |
 
-No other tools are needed for Phase 1.
-
 ## Starting Infrastructure
 
 From the project root:
@@ -19,7 +17,7 @@ From the project root:
 docker compose up -d
 ```
 
-This starts PostgreSQL, Redis, and MinIO.
+This starts PostgreSQL (17-alpine), Redis (7-alpine), and MinIO (latest).
 
 ### Check Service Status
 
@@ -118,29 +116,81 @@ npm run dev:api
 
 The API starts on http://localhost:3000.
 
+### Build
+
+```bash
+npm run build:api
+```
+
+Output: `apps/api/dist/`
+
+### Type Check
+
+```bash
+npm run typecheck:api
+```
+
+### Run Production Build
+
+```bash
+npm run start:prod
+```
+
 ### Health Check
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3000/api/v1/health
 ```
 
 Expected response:
 
 ```json
 {
-  "status": "ok",
-  "timestamp": "2026-01-01T00:00:00.000Z",
-  "checks": {
-    "database": "connected",
-    "redis": "connected",
-    "minio": "connected"
-  }
+  "success": true,
+  "data": {
+    "status": "ok",
+    "timestamp": "2026-01-01T00:00:00.000Z",
+    "checks": {
+      "database": "connected",
+      "redis": "connected",
+      "minio": "connected"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00.000Z"
 }
+```
+
+### Liveness / Readiness Probes
+
+```bash
+curl http://localhost:3000/api/v1/health/live
+curl http://localhost:3000/api/v1/health/ready
 ```
 
 ### API Docs
 
 Swagger UI: http://localhost:3000/api/docs
+
+### API Versioning
+
+All API routes are versioned via URI prefix: `/api/v1/...`
+
+### Environment Variables
+
+Required environment variables are defined in `.env.example`. Copy to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+### Testing
+
+Run all tests:
+
+```bash
+npm run test:unit
+npm run test:e2e
+```
 
 ## Prisma
 
@@ -188,11 +238,41 @@ cd apps/api
 npx prisma format
 ```
 
+## Graceful Shutdown
+
+The API supports graceful shutdown via SIGTERM/SIGINT. On shutdown:
+1. Express stops accepting new requests
+2. `onModuleDestroy` hooks are called for Prisma, Redis, and MinIO
+3. Process exits cleanly
+
+To test:
+```bash
+kill -SIGTERM <pid>
+```
+
+## Common Commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up -d` | Start all infrastructure services |
+| `docker compose down -v` | Stop services and wipe volumes |
+| `npm run dev:api` | Start API in watch mode |
+| `npm run build:api` | Build production bundle |
+| `npm run test:unit` | Run unit tests |
+| `npm run test:e2e` | Run e2e tests |
+| `npx prisma migrate dev` | Create & apply migration |
+| `npx prisma db seed` | Seed database |
+| `npx prisma studio` | Open Prisma Studio |
+
 ## Troubleshooting
 
 ### Docker Daemon Not Running
 
-Start Docker Desktop and wait for the whale icon to appear in the system tray.
+Start Docker Desktop and wait for the whale icon to appear in the system tray. Then:
+
+```bash
+docker compose up -d
+```
 
 ### Port Already in Use
 
@@ -214,3 +294,11 @@ npx prisma db seed
 1. Verify all containers are healthy: `docker compose ps`
 2. Check logs: `docker compose logs -f <service>`
 3. Restart containers: `docker compose down && docker compose up -d`
+4. Verify database: `docker compose exec postgres pg_isready -U staynest -d staynest`
+
+### API Returns 404 for Health Routes
+
+Health endpoints are versioned at `/api/v1/health`, not `/health`. Use:
+```bash
+curl http://localhost:3000/api/v1/health
+```
