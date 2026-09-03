@@ -1,35 +1,57 @@
 /* =============================================================================
- * StayNest Prisma Seed Script (Phase 1)
+ * StayNest Prisma Seed Script (Phase 1 + Phase 3)
  * =============================================================================
- * Creates development seed data with obviously fake local-only credentials.
+ * Creates development seed data.
+ * All seeded users share the same development-only password:
+ *   Password123!
+ *
  * Run with: npx prisma db seed
  */
 
 import { PrismaClient, UserRole, PropertyType, PropertyStatus, BookingStatus, PaymentStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 
+const SEED_DEV_PASSWORD = 'Password123!';
+const SEED_USERS = [
+  { id: 'admin-001', name: 'Admin User', email: 'admin@staynest.dev', role: UserRole.ADMIN },
+  { id: 'host-001', name: 'Alice Host', email: 'host1@staynest.dev', role: UserRole.HOST },
+  { id: 'host-002', name: 'Bob Host', email: 'host2@staynest.dev', role: UserRole.HOST },
+  { id: 'guest-001', name: 'Charlie Guest', email: 'guest1@staynest.dev', role: UserRole.GUEST },
+  { id: 'guest-002', name: 'Dana Guest', email: 'guest2@staynest.dev', role: UserRole.GUEST },
+  { id: 'guest-003', name: 'Eli Guest', email: 'guest3@staynest.dev', role: UserRole.GUEST },
+] as const;
+
+async function seedUsers(): Promise<void> {
+  const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
+  const passwordHash = await bcrypt.hash(SEED_DEV_PASSWORD, rounds);
+
+  for (const user of SEED_USERS) {
+    await prisma.user.upsert({
+      where: { id: user.id },
+      update: { passwordHash, name: user.name, role: user.role },
+      create: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        passwordHash,
+        role: user.role,
+      },
+    });
+  }
+  console.log(`Seeded ${SEED_USERS.length} users (1 admin, 2 hosts, 3 guests) with dev password: ${SEED_DEV_PASSWORD}`);
+}
+
 async function main(): Promise<void> {
   console.log('Seeding development data...');
 
   // ---- Users ----
-  await prisma.user.createMany({
-    data: [
-      { id: 'admin-001', name: 'Admin User', email: 'admin@staynest.dev', passwordHash: '$2b$10$fakehash_admin', role: UserRole.ADMIN },
-      { id: 'host-001', name: 'Alice Host', email: 'host1@staynest.dev', passwordHash: '$2b$10$fakehash_host1', role: UserRole.HOST },
-      { id: 'host-002', name: 'Bob Host', email: 'host2@staynest.dev', passwordHash: '$2b$10$fakehash_host2', role: UserRole.HOST },
-      { id: 'guest-001', name: 'Charlie Guest', email: 'guest1@staynest.dev', passwordHash: '$2b$10$fakehash_guest1', role: UserRole.GUEST },
-      { id: 'guest-002', name: 'Dana Guest', email: 'guest2@staynest.dev', passwordHash: '$2b$10$fakehash_guest2', role: UserRole.GUEST },
-      { id: 'guest-003', name: 'Eli Guest', email: 'guest3@staynest.dev', passwordHash: '$2b$10$fakehash_guest3', role: UserRole.GUEST },
-    ],
-    skipDuplicates: true,
-  });
-  console.log('Seeded 6 users (1 admin, 2 hosts, 3 guests)');
-
-  // ---- Amenities ----
+  await seedUsers();
+// ---- Amenities ----
   await prisma.amenity.createMany({
     data: [
       { name: 'WiFi' },

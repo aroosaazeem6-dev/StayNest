@@ -19,7 +19,7 @@ describe('Health Endpoints (e2e)', () => {
     process.env.MINIO_ACCESS_KEY = process.env.MINIO_ACCESS_KEY || 'test';
     process.env.MINIO_SECRET_KEY = process.env.MINIO_SECRET_KEY || 'test';
     process.env.MINIO_BUCKET = process.env.MINIO_BUCKET || 'test';
-    process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+    process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-32-chars-or-longer-pad';
     process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
     process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 
