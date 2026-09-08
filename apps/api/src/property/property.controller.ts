@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { UserRole, PropertyType } from '@prisma/client';
 import { PropertyService } from './property.service';
+import { CheckAvailabilityDto } from '../booking/dto/check-availability.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PropertyResponseDto } from './dto/property-response.dto';
@@ -125,5 +126,19 @@ export class PropertyController {
     @Param('id') id: string,
   ): Promise<{ message: string }> {
     return this.propertyService.remove(host, id);
+  }
+
+  @Post(':propertyId/availability/check')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Check if a property is available for the requested dates (public)' })
+  @ApiResponse({ status: 200, description: 'Availability check result', schema: { type: 'object', properties: { available: { type: 'boolean' } } } })
+  @ApiResponse({ status: 404, description: 'Property not found or not active' })
+  @ApiResponse({ status: 400, description: 'Invalid date range' })
+  async checkAvailability(
+    @Param('propertyId') propertyId: string,
+    @Body() dto: CheckAvailabilityDto,
+  ): Promise<{ available: boolean }> {
+    return this.propertyService.checkAvailability(propertyId, dto);
   }
 }

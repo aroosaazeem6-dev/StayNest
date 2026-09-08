@@ -7,6 +7,7 @@ import { MinioModule } from './minio/minio.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { PropertyModule } from './property/property.module';
+import { BookingModule } from './booking/booking.module';
 import configuration from './config/configuration';
 import { envValidationSchema } from './config/env.validation';
 
@@ -27,6 +28,7 @@ import { envValidationSchema } from './config/env.validation';
     HealthModule,
     AuthModule,
     PropertyModule,
+    BookingModule,
   ],
   controllers: [],
   providers: [],

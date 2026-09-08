@@ -21,6 +21,8 @@ import { PropertyResponseDto } from './dto/property-response.dto';
 import { PropertyListResponseDto } from './dto/property-list-response.dto';
 import { FindPropertiesQueryDto } from './dto/find-properties-query.dto';
 import { PaginationMetaDto } from './dto/property-list-response.dto';
+import { CheckAvailabilityDto } from '../booking/dto/check-availability.dto';
+import { BookingService } from '../booking/booking.service';
 import * as crypto from 'node:crypto';
 
 type PropertyWithRelations = Property & {
@@ -30,7 +32,10 @@ type PropertyWithRelations = Property & {
 
 @Injectable()
 export class PropertyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bookingService: BookingService,
+  ) {}
 
   async create(
     host: AuthenticatedUser,
@@ -274,6 +279,13 @@ export class PropertyService {
     });
 
     return { message: 'Property archived successfully' };
+  }
+
+  async checkAvailability(
+    id: string,
+    dto: CheckAvailabilityDto,
+  ): Promise<{ available: boolean }> {
+    return this.bookingService.checkAvailability(id, dto);
   }
 
   private async ensureCanManage(

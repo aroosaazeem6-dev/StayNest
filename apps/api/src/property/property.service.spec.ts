@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PropertyService } from './property.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BookingService } from '../booking/booking.service';
 import {
   Amenity,
   Prisma,
@@ -114,10 +115,15 @@ describe('PropertyService', () => {
       },
     };
 
+    const mockBookingService = {
+      checkAvailability: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PropertyService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: BookingService, useValue: mockBookingService },
       ],
     }).compile();
 
