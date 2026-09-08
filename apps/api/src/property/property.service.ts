@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -80,6 +81,16 @@ export class PropertyService {
   async findAll(
     query: FindPropertiesQueryDto,
   ): Promise<PropertyListResponseDto> {
+    if (
+      query.minPrice !== undefined &&
+      query.maxPrice !== undefined &&
+      query.minPrice > query.maxPrice
+    ) {
+      throw new BadRequestException(
+        'minPrice must be less than or equal to maxPrice',
+      );
+    }
+
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(50, Math.max(1, query.limit ?? 10));
     const skip = (page - 1) * limit;
@@ -93,14 +104,55 @@ export class PropertyService {
         country: { equals: query.country, mode: 'insensitive' },
       }),
       ...(query.propertyType && { propertyType: query.propertyType }),
+      ...(query.minPrice !== undefined || query.maxPrice !== undefined
+        ? {
+            pricePerNight: {
+              ...(query.minPrice !== undefined && { gte: query.minPrice }),
+              ...(query.maxPrice !== undefined && { lte: query.maxPrice }),
+            },
+          }
+        : {}),
+      ...(query.minGuests !== undefined && {
+        maxGuests: { gte: query.minGuests },
+      }),
+      ...(query.minBedrooms !== undefined && {
+        bedrooms: { gte: query.minBedrooms },
+      }),
     };
+
+    let propertyIds: string[] | undefined;
+    if (query.amenityIds) {
+      const raw = Array.isArray(query.amenityIds)
+        ? query.amenityIds
+        : [query.amenityIds];
+      const uniqueAmenityIds = [...new Set(raw.filter((id) => id.trim().length > 0))];
+      if (uniqueAmenityIds.length > 0) {
+        propertyIds = await this.findPropertyIdsWithAllAmenities(uniqueAmenityIds);
+        if (propertyIds.length === 0) {
+          return {
+            data: [],
+            meta: {
+              page,
+              limit,
+              total: 0,
+              totalPages: 0,
+              hasNext: false,
+              hasPrev: false,
+            } as PaginationMetaDto,
+          };
+        }
+        where.id = { in: propertyIds };
+      }
+    }
+
+    const orderBy = this.buildOrderBy(query.sort);
 
     const [properties, total] = await Promise.all([
       this.prisma.property.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           images: true,
           amenities: { include: { amenity: true } },
@@ -247,6 +299,53 @@ export class PropertyService {
     throw new ForbiddenException(
       'You do not have permission to manage this property',
     );
+  }
+
+  private async findPropertyIdsWithAllAmenities(
+    amenityIds: string[],
+  ): Promise<string[]> {
+    if (amenityIds.length === 0) {
+      return [];
+    }
+
+    const links = await this.prisma.propertyAmenity.findMany({
+      where: {
+        amenityId: { in: amenityIds },
+        property: { status: PropertyStatus.ACTIVE },
+      },
+      select: {
+        propertyId: true,
+        amenityId: true,
+      },
+    });
+
+    const counts = new Map<string, Set<string>>();
+    for (const link of links) {
+      if (!counts.has(link.propertyId)) {
+        counts.set(link.propertyId, new Set());
+      }
+      counts.get(link.propertyId)!.add(link.amenityId);
+    }
+
+    return Array.from(counts.entries())
+      .filter(([, ids]) => ids.size === amenityIds.length)
+      .map(([propertyId]) => propertyId);
+  }
+
+  private buildOrderBy(
+    sort?: string,
+  ): Prisma.PropertyOrderByWithRelationInput {
+    switch (sort) {
+      case 'oldest':
+        return { createdAt: 'asc' };
+      case 'price_asc':
+        return { pricePerNight: 'asc' };
+      case 'price_desc':
+        return { pricePerNight: 'desc' };
+      case 'newest':
+      default:
+        return { createdAt: 'desc' };
+    }
   }
 
   private toResponseDto(property: PropertyWithRelations): PropertyResponseDto {

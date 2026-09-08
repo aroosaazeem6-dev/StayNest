@@ -12,6 +12,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,6 +27,9 @@ type MockPrismaService = {
     findUnique: jest.Mock;
     update: jest.Mock;
     count: jest.Mock;
+  };
+  propertyAmenity: {
+    findMany: jest.Mock;
   };
 };
 
@@ -104,6 +108,9 @@ describe('PropertyService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
         count: jest.fn(),
+      },
+      propertyAmenity: {
+        findMany: jest.fn(),
       },
     };
 
@@ -290,6 +297,197 @@ describe('PropertyService', () => {
       expect(result.meta.totalPages).toBe(5);
       expect(result.meta.hasNext).toBe(true);
       expect(result.meta.hasPrev).toBe(false);
+    });
+
+    it('throws BadRequestException when minPrice > maxPrice', async () => {
+      await expect(
+        service.findAll({ minPrice: 500, maxPrice: 100 }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('filters by minPrice', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ minPrice: 200 });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            pricePerNight: { gte: 200 },
+          }),
+        }),
+      );
+    });
+
+    it('filters by maxPrice', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ maxPrice: 300 });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            pricePerNight: { lte: 300 },
+          }),
+        }),
+      );
+    });
+
+    it('filters by minGuests', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ minGuests: 3 });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            maxGuests: { gte: 3 },
+          }),
+        }),
+      );
+    });
+
+    it('filters by minBedrooms', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ minBedrooms: 2 });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            bedrooms: { gte: 2 },
+          }),
+        }),
+      );
+    });
+
+    it('returns empty result when amenityIds yields no matches', async () => {
+      prisma.propertyAmenity.findMany.mockResolvedValue([]);
+
+      const result = await service.findAll({
+        amenityIds: ['amenity-nonexistent'],
+      });
+
+      expect(result.data).toHaveLength(0);
+      expect(result.meta.total).toBe(0);
+      expect(prisma.property.findMany).not.toHaveBeenCalled();
+    });
+
+    it('filters by amenityIds with AND semantics', async () => {
+      prisma.propertyAmenity.findMany.mockResolvedValue([
+        { propertyId: 'prop-1', amenityId: 'amenity-1' },
+        { propertyId: 'prop-1', amenityId: 'amenity-2' },
+        { propertyId: 'prop-2', amenityId: 'amenity-1' },
+      ]);
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      const result = await service.findAll({
+        amenityIds: ['amenity-1', 'amenity-2'],
+      });
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].id).toBe('prop-1');
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: { in: ['prop-1'] },
+          }),
+        }),
+      );
+    });
+
+    it('sorts by newest (default)', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({});
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'desc' },
+        }),
+      );
+    });
+
+    it('sorts by oldest', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ sort: 'oldest' });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
+    });
+
+    it('sorts by price_asc', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ sort: 'price_asc' });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { pricePerNight: 'asc' },
+        }),
+      );
+    });
+
+    it('sorts by price_desc', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ sort: 'price_desc' });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { pricePerNight: 'desc' },
+        }),
+      );
+    });
+
+    it('combines city and price filters', async () => {
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({ city: 'Aspen', minPrice: 100, maxPrice: 300 });
+
+      expect(prisma.property.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            city: { equals: 'Aspen', mode: 'insensitive' },
+            pricePerNight: { gte: 100, lte: 300 },
+          }),
+        }),
+      );
+    });
+
+    it('deduplicates amenityIds before querying', async () => {
+      prisma.propertyAmenity.findMany.mockResolvedValue([
+        { propertyId: 'prop-1', amenityId: 'amenity-1' },
+      ]);
+      prisma.property.findMany.mockResolvedValue([mockProperty]);
+      prisma.property.count.mockResolvedValue(1);
+
+      await service.findAll({
+        amenityIds: ['amenity-1', 'amenity-1', 'amenity-2'],
+      });
+
+      expect(prisma.propertyAmenity.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            amenityId: { in: ['amenity-1', 'amenity-2'] },
+            property: { status: PropertyStatus.ACTIVE },
+          },
+        }),
+      );
     });
   });
 

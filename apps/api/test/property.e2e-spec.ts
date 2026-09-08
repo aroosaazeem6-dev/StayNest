@@ -130,6 +130,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'USA',
           pricePerNight: 100,
           maxGuests: 2,
+          bedrooms: 2,
           status: PropertyStatus.ACTIVE,
         },
         {
@@ -141,6 +142,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'USA',
           pricePerNight: 200,
           maxGuests: 4,
+          bedrooms: 3,
           status: PropertyStatus.ACTIVE,
         },
         {
@@ -152,6 +154,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'USA',
           pricePerNight: 150,
           maxGuests: 3,
+          bedrooms: 2,
           status: PropertyStatus.ACTIVE,
         },
         {
@@ -163,6 +166,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'USA',
           pricePerNight: 80,
           maxGuests: 1,
+          bedrooms: 1,
           status: PropertyStatus.DRAFT,
         },
         {
@@ -174,6 +178,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'USA',
           pricePerNight: 500,
           maxGuests: 6,
+          bedrooms: 4,
           status: PropertyStatus.ACTIVE,
         },
         {
@@ -185,6 +190,7 @@ describe('Property Endpoints (e2e)', () => {
           country: 'UK',
           pricePerNight: 1000,
           maxGuests: 10,
+          bedrooms: 5,
           status: PropertyStatus.DRAFT,
         },
       ],
@@ -390,6 +396,140 @@ describe('Property Endpoints (e2e)', () => {
         where: { id: { in: ['e2e-prop-1', 'e2e-prop-4'] } },
         data: { status: PropertyStatus.ACTIVE },
       });
+    });
+
+    it('filters by minPrice', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?minPrice=150')
+        .expect(HttpStatus.OK);
+
+      const prices = res.body.data.data.map((p: any) => p.pricePerNight);
+      prices.forEach((price: number) => {
+        expect(price).toBeGreaterThanOrEqual(150);
+      });
+    });
+
+    it('filters by maxPrice', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?maxPrice=150')
+        .expect(HttpStatus.OK);
+
+      const prices = res.body.data.data.map((p: any) => p.pricePerNight);
+      prices.forEach((price: number) => {
+        expect(price).toBeLessThanOrEqual(150);
+      });
+    });
+
+    it('filters by minGuests', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?minGuests=4')
+        .expect(HttpStatus.OK);
+
+      const guestCounts = res.body.data.data.map((p: any) => p.maxGuests);
+      guestCounts.forEach((count: number) => {
+        expect(count).toBeGreaterThanOrEqual(4);
+      });
+    });
+
+    it('filters by minBedrooms', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?minBedrooms=3')
+        .expect(HttpStatus.OK);
+
+      const bedroomCounts = res.body.data.data.map((p: any) => p.bedrooms);
+      bedroomCounts.forEach((count: number) => {
+        expect(count).toBeGreaterThanOrEqual(3);
+      });
+    });
+
+    it('excludes properties with null bedrooms from minBedrooms filter', async () => {
+      await prisma.property.update({
+        where: { id: 'e2e-prop-1' },
+        data: { bedrooms: null },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?minBedrooms=1')
+        .expect(HttpStatus.OK);
+
+      const returnedIds = res.body.data.data.map((p: any) => p.id);
+      expect(returnedIds).not.toContain('e2e-prop-1');
+
+      await prisma.property.update({
+        where: { id: 'e2e-prop-1' },
+        data: { bedrooms: 2 },
+      });
+    });
+
+    it('filters by amenityIds with AND semantics', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties')
+        .query({ amenityIds: [AMENITY_IDS.WIFI] })
+        .expect(HttpStatus.OK);
+
+      const returnedIds = res.body.data.data.map((p: any) => p.id);
+      expect(returnedIds).toContain('e2e-prop-1');
+      expect(returnedIds).toContain('e2e-prop-5');
+    });
+
+    it('returns empty result when amenityIds AND yields no matches', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties')
+        .query({ amenityIds: [AMENITY_IDS.WIFI, AMENITY_IDS.KITCHEN] })
+        .expect(HttpStatus.OK);
+
+      expect(res.body.data.data).toHaveLength(0);
+    });
+
+    it('sorts by price_asc', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?sort=price_asc')
+        .expect(HttpStatus.OK);
+
+      const prices = res.body.data.data.map((p: any) => p.pricePerNight);
+      for (let i = 1; i < prices.length; i++) {
+        expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
+      }
+    });
+
+    it('sorts by price_desc', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?sort=price_desc')
+        .expect(HttpStatus.OK);
+
+      const prices = res.body.data.data.map((p: any) => p.pricePerNight);
+      for (let i = 1; i < prices.length; i++) {
+        expect(prices[i]).toBeLessThanOrEqual(prices[i - 1]);
+      }
+    });
+
+    it('defaults to newest sort', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties')
+        .expect(HttpStatus.OK);
+
+      expect(res.body.data.data.length).toBeGreaterThan(0);
+    });
+
+    it('combines city and price filters', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/properties?city=Denver&minPrice=50&maxPrice=150')
+        .expect(HttpStatus.OK);
+
+      expect(res.body.success).toBe(true);
+      const allFromDenver = res.body.data.data.every((p: any) => p.city === 'Denver');
+      expect(allFromDenver).toBe(true);
+      const prices = res.body.data.data.map((p: any) => p.pricePerNight);
+      prices.forEach((price: number) => {
+        expect(price).toBeGreaterThanOrEqual(50);
+        expect(price).toBeLessThanOrEqual(150);
+      });
+    });
+
+    it('rejects invalid sort parameter with 400', async () => {
+      await request(app.getHttpServer())
+        .get('/api/v1/properties?sort=invalid_sort')
+        .expect(HttpStatus.BAD_REQUEST);
     });
   });
 

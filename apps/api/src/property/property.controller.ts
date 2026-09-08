@@ -51,12 +51,18 @@ export class PropertyController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'List all ACTIVE properties (public, paginated)' })
+  @ApiOperation({ summary: 'List all ACTIVE properties (public, paginated, filterable)' })
   @ApiQuery({ name: 'page', type: Number, required: false, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', type: Number, required: false, description: 'Items per page (default: 10, max: 50)' })
-  @ApiQuery({ name: 'city', type: String, required: false, description: 'Filter by city' })
-  @ApiQuery({ name: 'country', type: String, required: false, description: 'Filter by country' })
+  @ApiQuery({ name: 'city', type: String, required: false, description: 'Filter by city (case-insensitive)' })
+  @ApiQuery({ name: 'country', type: String, required: false, description: 'Filter by country (case-insensitive)' })
   @ApiQuery({ name: 'propertyType', enum: PropertyType, required: false, description: 'Filter by property type' })
+  @ApiQuery({ name: 'minPrice', type: Number, required: false, description: 'Minimum price per night (>= 0)' })
+  @ApiQuery({ name: 'maxPrice', type: Number, required: false, description: 'Maximum price per night (>= 0)' })
+  @ApiQuery({ name: 'minGuests', type: Number, required: false, description: 'Minimum guest capacity (>= 1)' })
+  @ApiQuery({ name: 'minBedrooms', type: Number, required: false, description: 'Minimum bedrooms (>= 0)' })
+  @ApiQuery({ name: 'amenityIds', type: [String], required: false, description: 'Amenity IDs (AND semantics)' })
+  @ApiQuery({ name: 'sort', enum: ['newest', 'oldest', 'price_asc', 'price_desc'], required: false, description: 'Sort order (default: newest)' })
   @ApiResponse({ status: 200, type: PropertyListResponseDto })
   async findAll(
     @Query() query: FindPropertiesQueryDto,
