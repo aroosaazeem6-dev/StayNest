@@ -47,8 +47,9 @@ async function bootstrap(): Promise<void> {
   // Swagger / OpenAPI
   const docsConfig = new DocumentBuilder()
     .setTitle('StayNest API')
-    .setDescription('StayNest REST API - Backend Foundation (Phase 2)')
-    .setVersion('2.0')
+    .setDescription('StayNest REST API')
+    .setVersion('4.0')
+    .addBearerAuth()
     .addServer('/api/v1', 'v1')
     .build();
 

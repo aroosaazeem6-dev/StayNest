@@ -6,6 +6,7 @@ import { RedisModule } from './redis/redis.module';
 import { MinioModule } from './minio/minio.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
+import { PropertyModule } from './property/property.module';
 import configuration from './config/configuration';
 import { envValidationSchema } from './config/env.validation';
 
@@ -25,6 +26,7 @@ import { envValidationSchema } from './config/env.validation';
     MinioModule,
     HealthModule,
     AuthModule,
+    PropertyModule,
   ],
   controllers: [],
   providers: [],
