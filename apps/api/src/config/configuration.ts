@@ -29,6 +29,13 @@ export default () => ({
     secretKey: process.env.MINIO_SECRET_KEY,
     bucket: process.env.MINIO_BUCKET ?? 'staynest',
   },
+  jazzcash: {
+    merchantId: process.env.JAZZCASH_MERCHANT_ID,
+    password: process.env.JAZZCASH_PASSWORD,
+    integritySalt: process.env.JAZZCASH_INTEGRITY_SALT,
+    returnUrl: process.env.JAZZCASH_RETURN_URL,
+    sandbox: process.env.JAZZCASH_SANDBOX === 'true',
+  },
   cors: {
     origin: process.env.CORS_ORIGIN ?? '*',
   },
