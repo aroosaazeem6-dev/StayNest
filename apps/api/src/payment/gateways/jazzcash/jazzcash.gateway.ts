@@ -6,8 +6,25 @@ import {
   JazzCashPaymentRequest,
   JazzCashPreparedPayment,
   JazzCashGatewayOptions,
+  JazzCashCallbackResponse,
 } from './jazzcash.types';
 
+/**
+ * The official JazzCash HMAC-SHA256 secure-hash convention:
+ *
+ * 1. Collect every pp_* field present in the payload.
+ * 2. Exclude pp_SecureHash itself from the hash input.
+ * 3. Sort the remaining field names in ascending ASCII order.
+ * 4. Concatenate their values with '&' between each value.
+ * 5. Prepend the Integrity Salt (Shared Secret) to the front of that
+ *    concatenated string.
+ * 6. HMAC-SHA256 the resulting string using the Integrity Salt as the key.
+ * 7. Compare the computed hex digest (uppercased) against the received
+ *    pp_SecureHash using a constant-time comparison.
+ *
+ * This is the response-side verification and is independent of the
+ * request-side hash ordering used in `buildHashString`.
+ */
 @Injectable()
 export class JazzCashGateway {
   private readonly config: JazzCashConfig;
@@ -62,9 +79,17 @@ export class JazzCashGateway {
     return `TNX${bookingPart}${timestamp}${randomPart}`.toUpperCase();
   }
 
-  private convertAmountToJazzCashFormat(amount: number): string {
+  convertAmountToJazzCashFormat(amount: number): string {
     const amountInPaisa = Math.round(amount * 100);
     return amountInPaisa.toString();
+  }
+
+  /**
+   * Public accessor for the configured merchant ID, used by PaymentService
+   * to validate callback merchant ID without exposing the full config.
+   */
+  get merchantId(): string {
+    return this.config.merchantId;
   }
 
   private formatDateTime(date: Date): string {
@@ -148,5 +173,127 @@ export class JazzCashGateway {
       this.config.integritySalt &&
       this.config.returnUrl
     );
+  }
+
+  /**
+   * Verifies the secure hash of a JazzCash callback response.
+   *
+   * This is the ONLY trust gate before any payment/booking state is mutated.
+   * Returns false when:
+   * - the integrity salt is not configured
+   * - the response is missing a pp_SecureHash
+   * - the received hash does not match the recomputed HMAC-SHA256
+   *
+   * The Integrity Salt is never exposed to callers.
+   */
+  verifyResponseHash(response: JazzCashCallbackResponse): boolean {
+    if (!this.config.integritySalt) {
+      return false;
+    }
+
+    const receivedHash = response.pp_SecureHash;
+    if (!receivedHash || typeof receivedHash !== 'string') {
+      return false;
+    }
+
+    const computedHash = this.computeResponseHash(response);
+    if (!computedHash) {
+      return false;
+    }
+
+    return this.constantTimeEquals(receivedHash.toUpperCase(), computedHash);
+  }
+
+  /**
+   * Computes the expected secure hash for a JazzCash response payload
+   * following the official JazzCash v4.2 HMAC-SHA256 convention:
+   *
+   *   1. Collect every pp_* field present in the payload.
+   *   2. Exclude pp_SecureHash itself from the hash input.
+   *   3. Sort the remaining field names in ascending ASCII order.
+   *   4. Concatenate their VALUES with NO separators.
+   *   5. Prepend the Integrity Salt directly to the concatenated value
+   *      string, also with NO separator.
+   *   6. HMAC-SHA256 the resulting string using the Integrity Salt as the key.
+   *   7. Hex encode the result.
+   *
+   * This is the response-side verification and is independent of the
+   * request-side hash ordering used in `buildHashString`.
+   */
+  private computeResponseHash(response: JazzCashCallbackResponse): string {
+    const fieldEntries = this.collectResponseHashFields(response);
+    if (fieldEntries.length === 0) {
+      return '';
+    }
+
+    // Sort field names in ascending ASCII order.
+    fieldEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+    // Concatenate field VALUES with NO separators, then prepend the
+    // Integrity Salt directly with NO separator.
+    const valueString = fieldEntries.map((entry) => entry.value).join('');
+    const message = `${this.config.integritySalt}${valueString}`;
+
+    const hmac = crypto.createHmac('sha256', this.config.integritySalt);
+    hmac.update(message);
+    return hmac.digest('hex').toUpperCase();
+  }
+
+  /**
+   * Collects every pp_* field from the response payload, excluding
+   * pp_SecureHash itself, so the hash input covers the complete set of
+   * transaction fields returned by JazzCash.
+   */
+  private collectResponseHashFields(
+    response: JazzCashCallbackResponse,
+  ): { name: string; value: string }[] {
+    const fields: { name: string; value: string }[] = [];
+
+    const known: Record<string, string> = {
+      pp_ResponseCode: response.pp_ResponseCode,
+      pp_ResponseMessage: response.pp_ResponseMessage,
+      pp_TxnRefNo: response.pp_TxnRefNo,
+      pp_Amount: response.pp_Amount,
+      pp_TxnCurrency: response.pp_TxnCurrency,
+      pp_MerchantID: response.pp_MerchantID,
+      pp_TxnDateTime: response.pp_TxnDateTime,
+      pp_TxnExpiryDateTime: response.pp_TxnExpiryDateTime,
+      pp_BillReference: response.pp_BillReference,
+      pp_Description: response.pp_Description,
+    };
+
+    for (const [name, value] of Object.entries(known)) {
+      if (value === undefined || value === null) {
+        continue;
+      }
+      fields.push({ name, value: String(value) });
+    }
+
+    for (const [name, value] of Object.entries(response.extraFields ?? {})) {
+      if (!name.startsWith('pp_') || name === 'pp_SecureHash') {
+        continue;
+      }
+      if (value === undefined || value === null) {
+        continue;
+      }
+      fields.push({ name, value: String(value) });
+    }
+
+    return fields;
+  }
+
+  /**
+   * Constant-time string comparison to prevent timing attacks when
+   * comparing the computed hash against the received hash.
+   */
+  private constantTimeEquals(a: string, b: string): boolean {
+    const bufA = Buffer.from(a, 'utf-8');
+    const bufB = Buffer.from(b, 'utf-8');
+
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(bufA, bufB);
   }
 }

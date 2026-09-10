@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentService } from './payment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JazzCashGateway } from './gateways/jazzcash/jazzcash.gateway';
+import { JazzCashCallbackResponse } from './gateways/jazzcash/jazzcash.types';
 import {
   BadRequestException,
   ForbiddenException,
@@ -18,10 +19,13 @@ import {
 import { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
 type MockPrismaService = {
+  $transaction: jest.Mock;
   booking: {
     findUnique: jest.Mock;
+    update: jest.Mock;
   };
   payment: {
+    findMany: jest.Mock;
     findUnique: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
@@ -31,6 +35,9 @@ type MockPrismaService = {
 type MockJazzCashGateway = {
   isConfigured: jest.Mock;
   preparePayment: jest.Mock;
+  verifyResponseHash: jest.Mock;
+  merchantId: string;
+  convertAmountToJazzCashFormat: jest.Mock;
 };
 
 describe('PaymentService', () => {
@@ -59,10 +66,37 @@ describe('PaymentService', () => {
     currency: 'PKR',
     status: PaymentStatus.PENDING,
     provider: 'JAZZCASH',
-    providerReference: null,
+    providerReference: 'TNXBK1ABC123',
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   };
+
+  const mockPendingPayment = {
+    ...mockPayment,
+    status: PaymentStatus.PENDING,
+    booking: {
+      ...mockBooking,
+      status: BookingStatus.PENDING,
+    },
+  };
+
+  const buildCallback = (
+    overrides: Partial<JazzCashCallbackResponse> = {},
+  ): JazzCashCallbackResponse => ({
+    pp_ResponseCode: '000',
+    pp_ResponseMessage: 'Thank you for Using JazzCash, your transaction was successful.',
+    pp_TxnRefNo: 'TNXBK1ABC123',
+    pp_SecureHash: 'VALIDHASH',
+    pp_Amount: '40000',
+    pp_TxnCurrency: 'PKR',
+    pp_MerchantID: 'MC12345',
+    pp_TxnDateTime: '20260910120000',
+    pp_TxnExpiryDateTime: '20260910123000',
+    pp_BillReference: 'bk-1',
+    pp_Description: 'StayNest booking bk-1',
+    extraFields: {},
+    ...overrides,
+  });
 
   const mockJazzCashPrepared = {
     transactionRef: 'TNXBK1ABC123',
@@ -100,11 +134,14 @@ describe('PaymentService', () => {
 
   beforeEach(async () => {
     const mockPrisma: MockPrismaService = {
+      $transaction: jest.fn().mockImplementation(async (fn: any) => fn(mockPrisma)),
       booking: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(mockPendingPayment.booking),
+        update: jest.fn(),
       },
       payment: {
-        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([mockPendingPayment]),
+        findUnique: jest.fn().mockResolvedValue(mockPendingPayment),
         create: jest.fn(),
         update: jest.fn(),
       },
@@ -113,6 +150,9 @@ describe('PaymentService', () => {
     const mockJazzCashGateway: MockJazzCashGateway = {
       isConfigured: jest.fn().mockReturnValue(true),
       preparePayment: jest.fn().mockReturnValue(mockJazzCashPrepared),
+      verifyResponseHash: jest.fn().mockReturnValue(true),
+      merchantId: 'MC12345',
+      convertAmountToJazzCashFormat: jest.fn().mockImplementation((amount: number) => String(Math.round(amount * 100))),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -444,6 +484,235 @@ describe('PaymentService', () => {
       expect(result.html).toContain('&#39;');
       expect(result.html).toContain('value="bk-1&lt;script&gt;alert(1)&lt;/script&gt;"');
       expect(result.html).toContain('value="StayNest &lt;b&gt;booking&lt;/b&gt; &amp; &quot;test&quot; &#39;quote&#39;"');
+    });
+  });
+
+  describe('handleJazzCashCallback', () => {
+    beforeEach(() => {
+      prisma.payment.findUnique.mockResolvedValue(mockPendingPayment);
+      prisma.payment.update.mockResolvedValue({ ...mockPendingPayment });
+      prisma.booking.update.mockResolvedValue(mockPendingPayment.booking);
+    });
+
+    it('verifies the secure hash before any state change', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(false);
+
+      await expect(service.handleJazzCashCallback(buildCallback())).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(jazzcashGateway.verifyResponseHash).toHaveBeenCalled();
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid secure hash without modifying anything', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(false);
+
+      await expect(service.handleJazzCashCallback(buildCallback())).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unknown transaction reference', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+      prisma.payment.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.handleJazzCashCallback(
+          buildCallback({ pp_TxnRefNo: 'UNKNOWN-REF' }),
+        ),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a wrong merchant ID', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      await expect(
+        service.handleJazzCashCallback(
+          buildCallback({ pp_MerchantID: 'WRONG-MERCHANT' }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a wrong currency', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      await expect(
+        service.handleJazzCashCallback(
+          buildCallback({ pp_TxnCurrency: 'USD' }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an amount mismatch', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      await expect(
+        service.handleJazzCashCallback(buildCallback({ pp_Amount: '99999' })),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('successful callback changes Payment to SUCCEEDED and Booking to CONFIRMED', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const result = await service.handleJazzCashCallback(buildCallback());
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { status: PaymentStatus.SUCCEEDED },
+      });
+      expect(prisma.booking.update).toHaveBeenCalledWith({
+        where: { id: 'bk-1' },
+        data: { status: BookingStatus.CONFIRMED },
+      });
+    });
+
+    it('failed callback changes Payment to FAILED and leaves Booking PENDING', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const result = await service.handleJazzCashCallback(
+        buildCallback({ pp_ResponseCode: '101', pp_ResponseMessage: 'Transaction failed' }),
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { status: PaymentStatus.FAILED },
+      });
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('duplicate successful callback is idempotent', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const succeededPayment = {
+        ...mockPendingPayment,
+        status: PaymentStatus.SUCCEEDED,
+        booking: {
+          ...mockPendingPayment.booking,
+          status: BookingStatus.CONFIRMED,
+        },
+      };
+
+      prisma.payment.findUnique.mockResolvedValue(succeededPayment);
+
+      const result = await service.handleJazzCashCallback(buildCallback());
+
+      expect(result).toEqual({ success: true });
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('already successful payment is not downgraded by a later failure', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const succeededPayment = {
+        ...mockPendingPayment,
+        status: PaymentStatus.SUCCEEDED,
+        booking: {
+          ...mockPendingPayment.booking,
+          status: BookingStatus.CONFIRMED,
+        },
+      };
+
+      prisma.payment.findUnique.mockResolvedValue(succeededPayment);
+
+      await service.handleJazzCashCallback(
+        buildCallback({ pp_ResponseCode: '101', pp_ResponseMessage: 'Late failure' }),
+      );
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('already failed payment is not upgraded by a later success', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const failedPayment = {
+        ...mockPendingPayment,
+        status: PaymentStatus.FAILED,
+      };
+
+      prisma.payment.findUnique.mockResolvedValue(failedPayment);
+
+      await service.handleJazzCashCallback(buildCallback());
+
+      expect(prisma.payment.update).not.toHaveBeenCalled();
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('cancelled booking is not confirmed', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const cancelledPayment = {
+        ...mockPendingPayment,
+        booking: {
+          ...mockPendingPayment.booking,
+          status: BookingStatus.CANCELLED,
+        },
+      };
+
+      prisma.payment.findUnique.mockResolvedValue(cancelledPayment);
+
+      await service.handleJazzCashCallback(buildCallback());
+
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { status: PaymentStatus.FAILED },
+      });
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('completed booking is not confirmed', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      const completedPayment = {
+        ...mockPendingPayment,
+        booking: {
+          ...mockPendingPayment.booking,
+          status: BookingStatus.COMPLETED,
+        },
+      };
+
+      prisma.payment.findUnique.mockResolvedValue(completedPayment);
+
+      await service.handleJazzCashCallback(buildCallback());
+
+      expect(prisma.payment.update).toHaveBeenCalledWith({
+        where: { id: 'pay-1' },
+        data: { status: PaymentStatus.FAILED },
+      });
+      expect(prisma.booking.update).not.toHaveBeenCalled();
+    });
+
+    it('Payment and Booking updates are atomic within a Prisma transaction', async () => {
+      jazzcashGateway.verifyResponseHash.mockReturnValue(true);
+
+      // Simulate a transaction failure mid-way: payment update succeeds but
+      // booking update throws. The whole transaction must roll back.
+      prisma.payment.update.mockResolvedValue({ ...mockPendingPayment });
+      prisma.booking.update.mockRejectedValue(new Error('Booking update failed'));
+
+      await expect(service.handleJazzCashCallback(buildCallback())).rejects.toThrow(
+        'Booking update failed',
+      );
     });
   });
 });

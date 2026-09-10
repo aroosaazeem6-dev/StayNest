@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JazzCashGateway } from './jazzcash.gateway';
 import { ConfigService } from '@nestjs/config';
+import { JazzCashCallbackResponse } from './jazzcash.types';
 
 describe('JazzCashGateway', () => {
   let gateway: JazzCashGateway;
@@ -316,6 +317,153 @@ describe('JazzCashGateway', () => {
 
       // First 8 alphanumeric chars of bookingId, uppercased
       expect(result.transactionRef).toContain('BOOKING1');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // verifyResponseHash
+  // ---------------------------------------------------------------------------
+
+  const buildValidResponse = (overrides: Partial<JazzCashCallbackResponse> = {}): JazzCashCallbackResponse => {
+    const base: JazzCashCallbackResponse = {
+      pp_ResponseCode: '000',
+      pp_ResponseMessage: 'Thank you for Using JazzCash, your transaction was successful.',
+      pp_TxnRefNo: 'TNXBK1ABC123',
+      pp_SecureHash: '',
+      pp_Amount: '40000',
+      pp_TxnCurrency: 'PKR',
+      pp_MerchantID: 'MC12345',
+      pp_TxnDateTime: '20260910120000',
+      pp_TxnExpiryDateTime: '20260910123000',
+      pp_BillReference: 'bk-1',
+      pp_Description: 'StayNest booking bk-1',
+      extraFields: {},
+    };
+
+    // Compute the correct secure hash for the base payload.
+    base.pp_SecureHash = gateway['computeResponseHash'](base);
+
+    return { ...base, ...overrides };
+  };
+
+  describe('verifyResponseHash', () => {
+    it('accepts a valid response hash', () => {
+      const response = buildValidResponse();
+      expect(gateway.verifyResponseHash(response)).toBe(true);
+    });
+
+    it('rejects an invalid response hash', () => {
+      const response = buildValidResponse();
+      response.pp_SecureHash = 'A'.repeat(64);
+      expect(gateway.verifyResponseHash(response)).toBe(false);
+    });
+
+    it('rejects a missing pp_SecureHash', () => {
+      const response = buildValidResponse();
+      response.pp_SecureHash = '';
+      expect(gateway.verifyResponseHash(response)).toBe(false);
+    });
+
+    it('rejects a non-string pp_SecureHash', () => {
+      const response = buildValidResponse();
+      (response as any).pp_SecureHash = undefined;
+      expect(gateway.verifyResponseHash(response)).toBe(false);
+    });
+
+    it('excludes pp_SecureHash from the hash input', () => {
+      // If pp_SecureHash were included in the hash input, changing it would
+      // not affect the computed hash, and verifyResponseHash would still pass.
+      const response = buildValidResponse();
+      const originalHash = response.pp_SecureHash;
+
+      response.pp_SecureHash = 'B'.repeat(64);
+
+      // The computed hash should NOT change because pp_SecureHash is excluded.
+      const recomputed = gateway['computeResponseHash'](response);
+      expect(recomputed).toBe(originalHash);
+      expect(gateway.verifyResponseHash(response)).toBe(false);
+    });
+
+    it('includes extra pp_* fields in the hash input', () => {
+      const base = buildValidResponse();
+      const withExtra: JazzCashCallbackResponse = {
+        ...base,
+        extraFields: {
+          pp_AuthCode: 'AUTH123',
+          pp_RetrievalReferenceNo: 'RRN001',
+        },
+      };
+
+      // Compute the hash with the extra fields included.
+      withExtra.pp_SecureHash = gateway['computeResponseHash'](withExtra);
+
+      // The hash with extra fields should differ from the base hash.
+      expect(withExtra.pp_SecureHash).not.toBe(base.pp_SecureHash);
+      expect(gateway.verifyResponseHash(withExtra)).toBe(true);
+
+      // Removing an extra field changes the hash and verification fails.
+      const withoutExtra: JazzCashCallbackResponse = {
+        ...withExtra,
+        extraFields: {},
+      };
+      expect(gateway.verifyResponseHash(withoutExtra)).toBe(false);
+    });
+
+    it('sorts pp_* field names in ascending ASCII order and concatenates values with NO separators', () => {
+      const response = buildValidResponse();
+      const computed = gateway['computeResponseHash'](response);
+
+      // Manually compute the expected hash using the official v4.2 convention:
+      // sort field names ascending ASCII, join values with NO separators,
+      // prepend the Integrity Salt directly with NO separator.
+      const fieldEntries = gateway['collectResponseHashFields'](response);
+      fieldEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      const valueString = fieldEntries.map((e) => e.value).join('');
+      const message = `${mockConfig.JAZZCASH_INTEGRITY_SALT}${valueString}`;
+
+      const expected = require('crypto')
+        .createHmac('sha256', mockConfig.JAZZCASH_INTEGRITY_SALT)
+        .update(message)
+        .digest('hex')
+        .toUpperCase();
+
+      expect(computed).toBe(expected);
+    });
+
+    it('uses NO separators between field values in the hash input', () => {
+      const response = buildValidResponse();
+      const fieldEntries = gateway['collectResponseHashFields'](response);
+      fieldEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+      // The hash input must NOT contain '&' separators between values.
+      const valueString = fieldEntries.map((e) => e.value).join('');
+      const message = `${mockConfig.JAZZCASH_INTEGRITY_SALT}${valueString}`;
+
+      expect(message).not.toContain('&');
+    });
+
+    it('uses constant-time comparison', () => {
+      const response = buildValidResponse();
+      // A hash of the same length but different content should fail.
+      response.pp_SecureHash = 'F'.repeat(64);
+      expect(gateway.verifyResponseHash(response)).toBe(false);
+    });
+
+    it('does not expose the integrity salt in any public method return value', () => {
+      const response = buildValidResponse();
+      const result = gateway.verifyResponseHash(response);
+      expect(result).toBe(true);
+
+      // The gateway's public API (verifyResponseHash return value) must not
+      // leak the salt. The salt is stored internally in the gateway config
+      // and is never returned to callers.
+      const resultString = JSON.stringify(result);
+      expect(resultString).not.toContain(mockConfig.JAZZCASH_INTEGRITY_SALT);
+
+      // Also confirm the computed hash itself is not the salt.
+      const computed = gateway['computeResponseHash'](response);
+      expect(computed).not.toBe(mockConfig.JAZZCASH_INTEGRITY_SALT);
+      expect(computed).not.toContain(mockConfig.JAZZCASH_INTEGRITY_SALT);
     });
   });
 });

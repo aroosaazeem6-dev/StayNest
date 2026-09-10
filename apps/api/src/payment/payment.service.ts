@@ -15,6 +15,7 @@ import {
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentInitiateResponseDto } from './dto/payment-initiate-response.dto';
 import { JazzCashGateway } from './gateways/jazzcash/jazzcash.gateway';
+import { JazzCashCallbackResponse } from './gateways/jazzcash/jazzcash.types';
 
 export interface JazzCashRedirectData {
   html: string;
@@ -203,5 +204,149 @@ export class PaymentService {
       },
       jazzcashEndpoint: endpointUrl,
     };
+  }
+
+  /**
+   * Handles a JazzCash callback (return URL POST).
+   *
+   * The callback is PUBLIC — no JWT — because JazzCash calls it directly.
+   *
+   * Processing order:
+   *   A. Verify the secure hash first. Never trust pp_ResponseCode.
+   *   B. Find the Payment by providerReference = pp_TxnRefNo.
+   *   C. Validate merchant ID.
+   *   D. Validate currency is PKR.
+   *   E. Validate pp_Amount matches Payment.amount (in paisa).
+   *   F. Only then process the response code.
+   *
+   * State transitions:
+   *   PENDING + success (000)  => Payment SUCCEEDED, Booking CONFIRMED
+   *   PENDING + failure        => Payment FAILED,   Booking PENDING
+   *
+   * Idempotency:
+   *   - SUCCEEDED + duplicate success => no change, safe success
+   *   - SUCCEEDED + later failure    => never downgrade
+   *   - FAILED + success              => never upgrade
+   *   - FAILED + failure             => idempotent
+   *   - CANCELLED / COMPLETED bookings are never confirmed
+   */
+  async handleJazzCashCallback(
+    response: JazzCashCallbackResponse,
+  ): Promise<{ success: boolean }> {
+    // A. Verify the secure hash FIRST. Reject before any state mutation.
+    if (!this.jazzcashGateway.verifyResponseHash(response)) {
+      throw new BadRequestException('Invalid JazzCash callback secure hash');
+    }
+
+    // B. Find the Payment by providerReference = pp_TxnRefNo.
+    // providerReference is not a @unique field, so use findMany with take: 1.
+    const payments = await this.prisma.payment.findMany({
+      where: { providerReference: response.pp_TxnRefNo },
+      include: { booking: true },
+      take: 1,
+    });
+
+    const payment = payments[0] ?? null;
+
+    if (!payment || !payment.booking) {
+      // Unknown transaction — do not create anything, do not modify anything.
+      throw new NotFoundException('Payment not found for JazzCash callback');
+    }
+
+    // C. Validate merchant ID.
+    if (response.pp_MerchantID !== this.jazzcashGateway.merchantId) {
+      throw new BadRequestException('Invalid JazzCash merchant ID');
+    }
+
+    // D. Validate currency is PKR.
+    if (response.pp_TxnCurrency !== 'PKR') {
+      throw new BadRequestException('Invalid JazzCash callback currency');
+    }
+
+    // E. Validate pp_Amount matches Payment.amount (in paisa).
+    const expectedAmount = this.jazzcashGateway.convertAmountToJazzCashFormat(
+      Number(payment.amount),
+    );
+    if (response.pp_Amount !== expectedAmount) {
+      throw new BadRequestException('JazzCash callback amount mismatch');
+    }
+
+    // F. Process the response code.
+    const isSuccessful = response.pp_ResponseCode === '000';
+
+    await this.applyCallbackState(payment, isSuccessful);
+
+    return { success: true };
+  }
+
+  /**
+   * Applies the callback state transition atomically within a Prisma
+   * transaction, respecting idempotency and booking-state protection.
+   */
+  private async applyCallbackState(
+    payment: Payment & { booking: { id: string; status: BookingStatus } },
+    isSuccessful: boolean,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const currentPayment = await tx.payment.findUnique({
+        where: { id: payment.id },
+        include: { booking: true },
+      });
+
+      if (!currentPayment || !currentPayment.booking) {
+        return;
+      }
+
+      const paymentStatus = currentPayment.status;
+      const bookingStatus = currentPayment.booking.status;
+
+      // Idempotency / downgrade protection.
+      if (paymentStatus === PaymentStatus.SUCCEEDED) {
+        // Already successful — never downgrade, even on a late failure.
+        return;
+      }
+
+      if (paymentStatus === PaymentStatus.FAILED) {
+        // A failed payment must never be upgraded to SUCCEEDED by a late callback.
+        if (isSuccessful) {
+          return;
+        }
+        // Re-applying failure is idempotent.
+        return;
+      }
+
+      if (paymentStatus !== PaymentStatus.PENDING) {
+        // Unknown payment state — do nothing.
+        return;
+      }
+
+      // Booking state protection: only PENDING bookings can be confirmed.
+      if (isSuccessful && bookingStatus !== BookingStatus.PENDING) {
+        // Do not confirm CANCELLED / COMPLETED / etc. bookings.
+        // Mark payment as failed instead so the attempt is recorded.
+        await tx.payment.update({
+          where: { id: currentPayment.id },
+          data: { status: PaymentStatus.FAILED },
+        });
+        return;
+      }
+
+      if (isSuccessful) {
+        await tx.payment.update({
+          where: { id: currentPayment.id },
+          data: { status: PaymentStatus.SUCCEEDED },
+        });
+        await tx.booking.update({
+          where: { id: currentPayment.booking.id },
+          data: { status: BookingStatus.CONFIRMED },
+        });
+      } else {
+        await tx.payment.update({
+          where: { id: currentPayment.id },
+          data: { status: PaymentStatus.FAILED },
+        });
+        // Booking remains PENDING.
+      }
+    });
   }
 }

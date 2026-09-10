@@ -35,3 +35,29 @@ export interface JazzCashGatewayOptions {
   amount: number;
   description?: string;
 }
+
+/**
+ * JazzCash callback (return URL) response payload.
+ *
+ * JazzCash posts transaction results to the configured pp_ReturnURL.
+ * The callback includes all pp_* fields returned by the gateway plus
+ * pp_ResponseCode / pp_ResponseMessage.
+ *
+ * Additional pp_* fields not listed explicitly are stored in `extraFields`
+ * so the secure-hash can be recomputed over the complete set.
+ */
+export interface JazzCashCallbackResponse {
+  pp_ResponseCode: string;
+  pp_ResponseMessage: string;
+  pp_TxnRefNo: string;
+  pp_SecureHash: string;
+  pp_Amount: string;
+  pp_TxnCurrency: string;
+  pp_MerchantID: string;
+  pp_TxnDateTime: string;
+  pp_TxnExpiryDateTime: string;
+  pp_BillReference: string;
+  pp_Description: string;
+  /** Any additional pp_* fields returned by JazzCash. */
+  extraFields: Record<string, string>;
+}
