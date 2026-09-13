@@ -1,0 +1,138 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { UserRole } from '@prisma/client';
+import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { adminService } from '@/lib/admin-service';
+
+type AdminBooking = Awaited<ReturnType<typeof adminService.getBooking>>;
+
+export default function AdminBookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const [id, setId] = useState<string | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    params.then((p) => {
+      if (mounted) setId(p.id);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [params]);
+
+  if (!id) return null;
+
+  return (
+    <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+      <div className="container-section py-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Booking</h1>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
+          <AdminSidebar />
+          <BookingDetail id={id} />
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
+}
+
+function BookingDetail({ id }: { id: string }) {
+  const router = useRouter();
+  const { tokens } = useAuth();
+  const [booking, setBooking] = useState<AdminBooking | null>(null);
+  const [state, setState] = useState<'loading' | 'success' | 'error' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    let mounted = true;
+    setState('loading');
+    adminService
+      .getBooking(tokens.accessToken, id)
+      .then((b) => {
+        if (!mounted) return;
+        setBooking(b);
+        setState('success');
+      })
+      .catch((err: unknown) => {
+        const e = err as { status?: number; message?: string } | undefined;
+        if (!mounted) return;
+        setState('error');
+        setError(e?.status === 404 ? 'Booking not found.' : e?.message || 'Unable to load booking.');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [id, tokens]);
+
+  if (state === 'loading' || !booking) {
+    return <div className="h-64 animate-pulse rounded-xl bg-gray-100" />;
+  }
+
+  if (state === 'error') {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-sm text-red-700">{error}</p>
+        <button onClick={() => router.refresh()} className="btn-primary mt-4">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Booking ID</dt>
+          <dd className="mt-1 font-mono text-sm text-gray-900">{booking.id}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Status</dt>
+          <dd className="mt-1 text-sm text-gray-900">{booking.status}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Property</dt>
+          <dd className="mt-1 text-sm text-gray-900">
+            {booking.property?.title ?? booking.propertyId}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Guest</dt>
+          <dd className="mt-1 text-sm text-gray-900">{booking.guest?.name ?? booking.guestId}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Check-in</dt>
+          <dd className="mt-1 text-sm text-gray-900">{booking.checkIn}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Check-out</dt>
+          <dd className="mt-1 text-sm text-gray-900">{booking.checkOut}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Guests</dt>
+          <dd className="mt-1 text-sm text-gray-900">{booking.guests}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Total</dt>
+          <dd className="mt-1 text-sm text-gray-900">${booking.totalAmount}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-gray-500">Created</dt>
+          <dd className="mt-1 text-sm text-gray-900">
+            {new Date(booking.createdAt).toLocaleString()}
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-6 flex gap-3">
+        <Link href="/admin/bookings" className="btn-secondary">
+          Back to bookings
+        </Link>
+      </div>
+    </div>
+  );
+}
