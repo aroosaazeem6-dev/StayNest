@@ -18,13 +18,27 @@ const prisma = new PrismaClient({
 
 const SEED_DEV_PASSWORD = 'Password123!';
 const SEED_USERS = [
-  { id: 'admin-001', name: 'Admin User', email: 'admin@staynest.dev', role: UserRole.ADMIN },
-  { id: 'host-001', name: 'Alice Host', email: 'host1@staynest.dev', role: UserRole.HOST },
-  { id: 'host-002', name: 'Bob Host', email: 'host2@staynest.dev', role: UserRole.HOST },
-  { id: 'guest-001', name: 'Charlie Guest', email: 'guest1@staynest.dev', role: UserRole.GUEST },
-  { id: 'guest-002', name: 'Dana Guest', email: 'guest2@staynest.dev', role: UserRole.GUEST },
-  { id: 'guest-003', name: 'Eli Guest', email: 'guest3@staynest.dev', role: UserRole.GUEST },
+  { id: 'admin-001', name: 'Admin User', email: 'admin@staynest.dev', role: UserRole.ADMIN, isHost: false },
+  { id: 'host-001', name: 'Alice Host', email: 'host1@staynest.dev', role: UserRole.GUEST, isHost: true },
+  { id: 'host-002', name: 'Bob Host', email: 'host2@staynest.dev', role: UserRole.GUEST, isHost: true },
+  { id: 'guest-001', name: 'Charlie Guest', email: 'guest1@staynest.dev', role: UserRole.GUEST, isHost: false },
+  { id: 'guest-002', name: 'Dana Guest', email: 'guest2@staynest.dev', role: UserRole.GUEST, isHost: false },
+  { id: 'guest-003', name: 'Eli Guest', email: 'guest3@staynest.dev', role: UserRole.GUEST, isHost: false },
 ] as const;
+
+/**
+ * Dedicated admin test account with its own credentials.
+ *
+ * This is intentionally separate from SEED_USERS so it can carry a distinct
+ * password. It is upserted by email (the unique key) and never removes or
+ * alters any other seeded account.
+ */
+const SEED_ADMIN_ACCOUNT = {
+  email: 'admin123@gmail.com',
+  name: 'Admin Test Account',
+  password: 'adminsecure123',
+  role: UserRole.ADMIN,
+};
 
 async function seedUsers(): Promise<void> {
   const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
@@ -33,17 +47,36 @@ async function seedUsers(): Promise<void> {
   for (const user of SEED_USERS) {
     await prisma.user.upsert({
       where: { id: user.id },
-      update: { passwordHash, name: user.name, role: user.role },
+      update: { passwordHash, name: user.name, role: user.role, isHost: user.isHost },
       create: {
         id: user.id,
         name: user.name,
         email: user.email,
         passwordHash,
         role: user.role,
+        isHost: user.isHost,
       },
     });
   }
   console.log(`Seeded ${SEED_USERS.length} users (1 admin, 2 hosts, 3 guests) with dev password: ${SEED_DEV_PASSWORD}`);
+}
+
+async function seedAdminAccount(): Promise<void> {
+  const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10);
+  const passwordHash = await bcrypt.hash(SEED_ADMIN_ACCOUNT.password, rounds);
+  await prisma.user.upsert({
+    where: { email: SEED_ADMIN_ACCOUNT.email },
+    update: { name: SEED_ADMIN_ACCOUNT.name, passwordHash, role: SEED_ADMIN_ACCOUNT.role },
+    create: {
+      name: SEED_ADMIN_ACCOUNT.name,
+      email: SEED_ADMIN_ACCOUNT.email,
+      passwordHash,
+      role: SEED_ADMIN_ACCOUNT.role,
+    },
+  });
+  console.log(
+    `Seeded admin test account ${SEED_ADMIN_ACCOUNT.email} (role: ${SEED_ADMIN_ACCOUNT.role})`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -51,6 +84,7 @@ async function main(): Promise<void> {
 
   // ---- Users ----
   await seedUsers();
+  await seedAdminAccount();
 // ---- Amenities ----
   await prisma.amenity.createMany({
     data: [

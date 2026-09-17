@@ -133,6 +133,104 @@ export const propertyService = {
   async findOne(id: string): Promise<Property> {
     return apiClient.request<Property>(`/properties/${id}`, {}, null);
   },
+
+  /**
+   * List properties owned by the authenticated host.
+   * Endpoint: GET /api/v1/properties/mine (HOST/ADMIN only)
+   * Returns PropertyResponseDto[] (no pagination envelope).
+   */
+  async findMine(accessToken: string): Promise<Property[]> {
+    return apiClient.request<Property[]>(
+      '/properties/mine',
+      {},
+      accessToken,
+    );
+  },
+
+  /**
+   * Create a property as the authenticated host.
+   * Endpoint: POST /api/v1/properties (HOST/ADMIN only)
+   * Returns PropertyResponseDto. New properties start as DRAFT.
+   */
+  async create(
+    body: CreatePropertyRequest,
+    accessToken: string,
+  ): Promise<Property> {
+    return apiClient.request<Property>(
+      '/properties',
+      { method: 'POST', body: JSON.stringify(body) },
+      accessToken,
+    );
+  },
+
+  /**
+   * Update a property owned by the authenticated host.
+   * Endpoint: PATCH /api/v1/properties/:id (HOST owner or ADMIN only)
+   * Returns PropertyResponseDto.
+   */
+  async update(
+    id: string,
+    body: UpdatePropertyRequest,
+    accessToken: string,
+  ): Promise<Property> {
+    return apiClient.request<Property>(
+      `/properties/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+      accessToken,
+    );
+  },
+
+  /**
+   * Archive a property owned by the authenticated host.
+   * Endpoint: DELETE /api/v1/properties/:id (HOST owner or ADMIN only)
+   * Archives (does not hard-delete) the property.
+   */
+  async remove(id: string, accessToken: string): Promise<{ message: string }> {
+    return apiClient.request<{ message: string }>(
+      `/properties/${id}`,
+      { method: 'DELETE' },
+      accessToken,
+    );
+  },
 };
+
+/** Mirrors CreatePropertyDto from the backend. */
+export interface CreatePropertyRequest {
+  title: string;
+  description?: string;
+  propertyType: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  pricePerNight: number;
+  maxGuests: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  amenityIds?: string[];
+  imageUrls?: string[];
+}
+
+/** Mirrors UpdatePropertyDto from the backend (all fields optional). */
+export interface UpdatePropertyRequest {
+  title?: string;
+  description?: string | null;
+  propertyType?: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  pricePerNight?: number;
+  maxGuests?: number;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  status?: string;
+  amenityIds?: string[];
+  imageUrls?: string[];
+}
 
 export default propertyService;

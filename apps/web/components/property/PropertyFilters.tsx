@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PROPERTY_TYPES, SORT_OPTIONS, type FindPropertiesQuery } from '@/lib/property-service';
 
 interface PropertyFiltersProps {
@@ -7,6 +8,46 @@ interface PropertyFiltersProps {
 }
 
 export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersProps) {
+  // Free-text and numeric fields are edited locally and only committed to the
+  // URL/search when the user explicitly applies the form (Enter or button).
+  // This prevents a fetch on every keystroke (e.g. typing "2" -> "20" -> "200").
+  const [draft, setDraft] = useState<FindPropertiesQuery>(() => ({
+    city: query.city ?? '',
+    country: query.country ?? '',
+    propertyType: query.propertyType,
+    minPrice: query.minPrice,
+    maxPrice: query.maxPrice,
+    minGuests: query.minGuests,
+    minBedrooms: query.minBedrooms,
+    amenityIds: query.amenityIds,
+    sort: query.sort,
+  }));
+
+  const applyFilters = () => {
+    const num = (v: number | undefined): number | undefined =>
+      v === undefined || Number.isNaN(v) ? undefined : v;
+    const next: FindPropertiesQuery = {
+      page: 1,
+      city: (draft.city as string | undefined)?.trim() || undefined,
+      country: (draft.country as string | undefined)?.trim() || undefined,
+      propertyType: draft.propertyType,
+      minPrice: num(draft.minPrice),
+      maxPrice: num(draft.maxPrice),
+      minGuests: num(draft.minGuests),
+      minBedrooms: num(draft.minBedrooms),
+      amenityIds: draft.amenityIds,
+      sort: draft.sort,
+    };
+    onChange(next);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyFilters();
+    }
+  };
+
   const hasFilters =
     !!query.city ||
     !!query.country ||
@@ -39,8 +80,9 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
           <input
             id="city"
             type="text"
-            value={query.city ?? ''}
-            onChange={(e) => onChange({ ...query, city: e.target.value })}
+            value={(draft.city as string) ?? ''}
+            onChange={(e) => setDraft({ ...draft, city: e.target.value })}
+            onKeyDown={handleKeyDown}
             placeholder="e.g. Aspen"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           />
@@ -53,8 +95,9 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
           <input
             id="country"
             type="text"
-            value={query.country ?? ''}
-            onChange={(e) => onChange({ ...query, country: e.target.value })}
+            value={(draft.country as string) ?? ''}
+            onChange={(e) => setDraft({ ...draft, country: e.target.value })}
+            onKeyDown={handleKeyDown}
             placeholder="e.g. USA"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           />
@@ -66,10 +109,13 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
           </label>
           <select
             id="propertyType"
-            value={query.propertyType ?? ''}
-            onChange={(e) =>
-              onChange({ ...query, propertyType: e.target.value || undefined })
-            }
+            value={draft.propertyType ?? ''}
+            onChange={(e) => {
+              const next = { ...draft, propertyType: e.target.value || undefined };
+              setDraft(next);
+              // Selects commit immediately for a responsive UI.
+              onChange({ ...next, page: 1 });
+            }}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Any</option>
@@ -90,13 +136,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
               id="minPrice"
               type="number"
               min={0}
-              value={query.minPrice ?? ''}
+              value={draft.minPrice ?? ''}
               onChange={(e) =>
-                onChange({
-                  ...query,
+                setDraft({
+                  ...draft,
                   minPrice: e.target.value ? Number(e.target.value) : undefined,
                 })
               }
+              onKeyDown={handleKeyDown}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             />
           </div>
@@ -108,13 +155,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
               id="maxPrice"
               type="number"
               min={0}
-              value={query.maxPrice ?? ''}
+              value={draft.maxPrice ?? ''}
               onChange={(e) =>
-                onChange({
-                  ...query,
+                setDraft({
+                  ...draft,
                   maxPrice: e.target.value ? Number(e.target.value) : undefined,
                 })
               }
+              onKeyDown={handleKeyDown}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             />
           </div>
@@ -129,13 +177,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
               id="minGuests"
               type="number"
               min={1}
-              value={query.minGuests ?? ''}
+              value={draft.minGuests ?? ''}
               onChange={(e) =>
-                onChange({
-                  ...query,
+                setDraft({
+                  ...draft,
                   minGuests: e.target.value ? Number(e.target.value) : undefined,
                 })
               }
+              onKeyDown={handleKeyDown}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             />
           </div>
@@ -147,13 +196,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
               id="minBedrooms"
               type="number"
               min={0}
-              value={query.minBedrooms ?? ''}
+              value={draft.minBedrooms ?? ''}
               onChange={(e) =>
-                onChange({
-                  ...query,
+                setDraft({
+                  ...draft,
                   minBedrooms: e.target.value ? Number(e.target.value) : undefined,
                 })
               }
+              onKeyDown={handleKeyDown}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             />
           </div>
@@ -165,10 +215,13 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
           </label>
           <select
             id="sort"
-            value={query.sort ?? ''}
-            onChange={(e) =>
-              onChange({ ...query, sort: (e.target.value || undefined) as FindPropertiesQuery['sort'] })
-            }
+            value={draft.sort ?? ''}
+            onChange={(e) => {
+              const next = { ...draft, sort: (e.target.value || undefined) as FindPropertiesQuery['sort'] };
+              setDraft(next);
+              // Sort commits immediately for a responsive UI.
+              onChange({ ...next, page: 1 });
+            }}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
           >
             <option value="">Newest</option>
@@ -179,6 +232,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
             ))}
           </select>
         </div>
+
+        <button
+          type="button"
+          onClick={applyFilters}
+          className="btn-primary w-full"
+        >
+          Apply filters
+        </button>
       </div>
     </div>
   );

@@ -87,4 +87,27 @@ export class AuthController {
   async me(@CurrentUser() user: AuthenticatedUser): Promise<AuthResponseDto['user']> {
     return this.authService.me(user.id);
   }
+
+  @Post('become-host')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Grant host capability to the authenticated guest',
+    description:
+      'A GUEST account gains host capability (isHost=true) while keeping role=GUEST. ' +
+      'Idempotent: repeated calls are safe. ADMIN role is never granted or changed. ' +
+      'A fresh token pair is issued so the session reflects the new state.',
+  })
+  @ApiResponse({ status: 200, type: AuthResponseDto })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  @ApiResponse({ status: 403, description: 'Only guest accounts can become hosts' })
+  async becomeHost(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AuthResponseDto> {
+    const result = await this.authService.becomeHost(user.id);
+    return { user: result.user, tokens: result.tokens };
+  }
 }
+
+
+

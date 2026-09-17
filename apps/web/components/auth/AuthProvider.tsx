@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { UserRole } from '@prisma/client';
 import { authService } from '@/lib/auth-service';
 import {
   AuthState,
@@ -33,6 +34,20 @@ export function useAuth(): AuthContextValue {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return ctx;
+}
+
+/** Destination after login/register, keyed by the authenticated user's role. */
+function roleHomePath(role: UserRole | undefined): string {
+  switch (role) {
+    case UserRole.GUEST:
+      return '/bookings';
+    case UserRole.HOST:
+      return '/host';
+    case UserRole.ADMIN:
+      return '/admin';
+    default:
+      return '/';
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -81,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       const res = await authService.login(email, password);
       setAuth(res.user, res.tokens);
-      router.push('/');
+      router.push(roleHomePath(res.user.role));
     },
     [router, setAuth],
   );
@@ -90,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string, name: string) => {
       const res = await authService.register(email, password, name);
       setAuth(res.user, res.tokens);
-      router.push('/');
+      router.push(roleHomePath(res.user.role));
     },
     [router, setAuth],
   );

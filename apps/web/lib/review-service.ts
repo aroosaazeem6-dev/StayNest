@@ -36,6 +36,32 @@ export interface CreateReviewRequest {
   comment?: string;
 }
 
+/** Mirrors PaginationMetaDto from the backend. */
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+/** Mirrors ReviewListResponseDto from the backend. */
+export interface ReviewListResponse {
+  data: Review[];
+  meta: PaginationMeta;
+}
+
+/**
+ * Query shape for listing reviews (mirrors ListReviewsQueryDto).
+ * All fields are optional; the backend defaults to page=1, limit=10.
+ */
+export interface ListReviewsQuery {
+  page?: number;
+  limit?: number;
+  minRating?: number;
+}
+
 /**
  * Thin service layer over the review API.
  *
@@ -58,6 +84,29 @@ export const reviewService = {
       },
       accessToken,
     );
+  },
+
+  /**
+   * List reviews for a property (public, paginated).
+   * Endpoint: GET /api/v1/properties/:propertyId/reviews?page=&limit=&minRating=
+   * Response: ReviewListResponseDto
+   */
+  async findAll(
+    propertyId: string,
+    query: ListReviewsQuery = {},
+  ): Promise<ReviewListResponse> {
+    const params = new URLSearchParams();
+    if (query.page !== undefined) params.set('page', String(query.page));
+    if (query.limit !== undefined) params.set('limit', String(query.limit));
+    if (query.minRating !== undefined)
+      params.set('minRating', String(query.minRating));
+
+    const qs = params.toString();
+    const path = qs
+      ? `/properties/${propertyId}/reviews?${qs}`
+      : `/properties/${propertyId}/reviews`;
+
+    return apiClient.request<ReviewListResponse>(path, {}, null);
   },
 };
 

@@ -59,6 +59,30 @@ export const favoriteService = {
       accessToken,
     );
   },
+
+  /**
+   * Check whether the authenticated guest has favorited a property.
+   * Endpoint: GET /api/v1/properties/:propertyId/favorite -> { favorited: boolean }
+   */
+  async isFavorited(propertyId: string, accessToken: string): Promise<{ favorited: boolean }> {
+    return apiClient.request<{ favorited: boolean }>(
+      `/properties/${propertyId}/favorite`,
+      {},
+      accessToken,
+    );
+  },
+
+  /**
+   * Add a property to the authenticated guest's favorites.
+   * Endpoint: POST /api/v1/properties/:propertyId/favorite -> FavoriteResponseDto
+   */
+  async add(propertyId: string, accessToken: string): Promise<Favorite> {
+    return apiClient.request<Favorite>(
+      `/properties/${propertyId}/favorite`,
+      { method: 'POST' },
+      accessToken,
+    );
+  },
 };
 
 export default favoriteService;

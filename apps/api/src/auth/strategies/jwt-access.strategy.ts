@@ -10,6 +10,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   role: UserRole;
+  isHost?: boolean;
   iat?: number;
   exp?: number;
 }
@@ -36,6 +37,8 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
       id: payload.sub,
       email: payload.email,
       role: payload.role,
+      // Older tokens may not carry isHost — default to false.
+      isHost: payload.isHost === true,
     };
   }
 }

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { propertyService, type Property } from '@/lib/property-service';
 import { BookingCard } from './BookingCard';
+import { FavoriteButton } from './FavoriteButton';
+import { ReviewList } from './ReviewList';
 
 interface PropertyDetailsViewProps {
   propertyId: string;
@@ -76,6 +78,22 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
         </Link>
       </div>
 
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+            {property.title}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {[property.city, property.country].filter(Boolean).join(', ') ||
+              'Location TBA'}
+          </p>
+          <span className="mt-2 inline-block rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+            {property.propertyType}
+          </span>
+        </div>
+        <FavoriteButton propertyId={property.id} />
+      </div>
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <PropertyGallery property={property} />
         <div>
@@ -86,6 +104,11 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
             }
           />
         </div>
+      </div>
+
+      <div className="mt-12">
+        <h2 className="mb-4 text-xl font-bold text-gray-900">Reviews</h2>
+        <ReviewList propertyId={property.id} />
       </div>
     </div>
   );

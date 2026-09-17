@@ -41,6 +41,12 @@ export class PropertyService {
     host: AuthenticatedUser,
     dto: CreatePropertyDto,
   ): Promise<PropertyResponseDto> {
+    if (host.role !== UserRole.ADMIN && !this.canHost(host)) {
+      throw new ForbiddenException(
+        'You do not have permission to create properties',
+      );
+    }
+
     const property = await this.prisma.property.create({
       data: {
         hostId: host.id,
@@ -182,6 +188,12 @@ export class PropertyService {
   }
 
   async findMine(host: AuthenticatedUser): Promise<PropertyResponseDto[]> {
+    if (!this.canHost(host)) {
+      throw new ForbiddenException(
+        'You do not have permission to manage properties',
+      );
+    }
+
     const properties = await this.prisma.property.findMany({
       where: { hostId: host.id },
       orderBy: { createdAt: 'desc' },
@@ -213,7 +225,7 @@ export class PropertyService {
     if (property.status !== PropertyStatus.ACTIVE) {
       const isOwner =
         requestingUser !== undefined &&
-        requestingUser.role === UserRole.HOST &&
+        this.canHost(requestingUser) &&
         property.hostId === requestingUser.id;
       const isAdmin = requestingUser?.role === UserRole.ADMIN;
 
@@ -304,13 +316,33 @@ export class PropertyService {
       return;
     }
 
-    if (user.role === UserRole.HOST && property.hostId === user.id) {
+    if (this.canHost(user) && property.hostId === user.id) {
       return;
     }
 
     throw new ForbiddenException(
       'You do not have permission to manage this property',
     );
+  }
+
+  /**
+   * Host capability check.
+   *
+   * A user can manage properties when:
+   * - role === ADMIN (handled by callers before reaching here), or
+   * - role === HOST (legacy accounts), or
+   * - role === GUEST && isHost === true (new dual-capability design)
+   *
+   * A pure GUEST (role === GUEST && isHost === false) can never host.
+   */
+  private canHost(user: AuthenticatedUser): boolean {
+    if (user.role === UserRole.HOST) {
+      return true;
+    }
+    if (user.role === UserRole.GUEST && user.isHost === true) {
+      return true;
+    }
+    return false;
   }
 
   private async findPropertyIdsWithAllAmenities(

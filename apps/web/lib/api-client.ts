@@ -7,12 +7,43 @@ export type ApiError = {
 };
 
 /**
+ * Backend response envelope produced by the global ResponseInterceptor
+ * (apps/api/src/common/interceptors/response.interceptor.ts):
+ *
+ *   { success: true, data: <actual payload>, timestamp: "..." }
+ *
+ * `request` unwraps this envelope and returns the inner `data` to callers,
+ * so service layers can work with the real payload directly
+ * (e.g. { data: [...], meta: {...} } for paginated endpoints).
+ *
+ * If the response is not a wrapped envelope (no `success` field), it is
+ * returned as-is, which keeps the client tolerant of any non-standard
+ * responses.
+ */
+type Envelope = {
+  success?: boolean;
+  data?: unknown;
+  timestamp?: string;
+};
+
+function unwrap(body: unknown): unknown {
+  if (body && typeof body === 'object' && 'success' in (body as object)) {
+    const env = body as Envelope;
+    if (env.success === true && 'data' in env) {
+      return env.data;
+    }
+  }
+  return body;
+}
+
+/**
  * Minimal API client foundation.
  *
  * Centralizes the backend base URL so no caller hardcodes it.
  * `request` is a thin wrapper around fetch that:
  *   - attaches the Bearer access token when one is provided
  *   - parses JSON responses
+ *   - unwraps the global ResponseInterceptor envelope ({ success, data, timestamp })
  *   - normalizes non-2xx responses into a structured ApiError
  *   - does NOT retry or auto-refresh (those belong to later steps)
  */
@@ -48,9 +79,10 @@ export const apiClient = {
     }
 
     if (!response.ok) {
+      const unwrapped = unwrap(body);
       const message =
-        body && typeof body === 'object'
-          ? (body as { message?: string | string[] }).message
+        unwrapped && typeof unwrapped === 'object'
+          ? (unwrapped as { message?: string | string[] }).message
           : undefined;
       const messageText = Array.isArray(message)
         ? message.join(', ')
@@ -58,12 +90,12 @@ export const apiClient = {
       const error: ApiError = {
         status: response.status,
         message: messageText || response.statusText,
-        details: body,
+        details: unwrapped,
       };
       throw error;
     }
 
-    return body as T;
+    return unwrap(body) as T;
   },
 };
 

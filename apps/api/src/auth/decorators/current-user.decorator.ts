@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   role: UserRole;
+  isHost?: boolean;
 }
 
 export const CurrentUser = createParamDecorator(
@@ -13,3 +14,4 @@ export const CurrentUser = createParamDecorator(
     return request.user as AuthenticatedUser | undefined;
   },
 );
+

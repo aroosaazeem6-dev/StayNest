@@ -36,13 +36,13 @@ export class PropertyController {
   constructor(private readonly propertyService: PropertyService) {}
 
   @Post()
-  @Roles(UserRole.HOST, UserRole.ADMIN)
+  @Roles(UserRole.GUEST, UserRole.HOST, UserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new property (HOST or ADMIN)' })
+  @ApiOperation({ summary: 'Create a new property (host-capable guest, HOST, or ADMIN)' })
   @ApiResponse({ status: 201, type: PropertyResponseDto })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
-  @ApiResponse({ status: 403, description: 'Insufficient role' })
+  @ApiResponse({ status: 403, description: 'Insufficient host capability' })
   async create(
     @CurrentUser() host: AuthenticatedUser,
     @Body() dto: CreatePropertyDto,
@@ -72,11 +72,11 @@ export class PropertyController {
   }
 
   @Get('mine')
-  @Roles(UserRole.HOST, UserRole.ADMIN)
+  @Roles(UserRole.GUEST, UserRole.HOST, UserRole.ADMIN)
   @ApiOperation({ summary: 'List properties owned by the authenticated host (all statuses)' })
   @ApiResponse({ status: 200, type: [PropertyResponseDto] })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
-  @ApiResponse({ status: 403, description: 'Insufficient role' })
+  @ApiResponse({ status: 403, description: 'Insufficient host capability' })
   async findMine(
     @CurrentUser() host: AuthenticatedUser,
   ): Promise<PropertyResponseDto[]> {
@@ -98,8 +98,8 @@ export class PropertyController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.HOST, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update a property (HOST owner or ADMIN only)' })
+  @Roles(UserRole.GUEST, UserRole.HOST, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update a property (owner with host capability or ADMIN only)' })
   @ApiResponse({ status: 200, type: PropertyResponseDto })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
@@ -114,9 +114,9 @@ export class PropertyController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.HOST, UserRole.ADMIN)
+  @Roles(UserRole.GUEST, UserRole.HOST, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Archive a property (HOST owner or ADMIN only)' })
+  @ApiOperation({ summary: 'Archive a property (owner with host capability or ADMIN only)' })
   @ApiResponse({ status: 200, description: 'Property archived' })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
   @ApiResponse({ status: 403, description: 'Not the owner and not an admin' })

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -49,10 +50,11 @@ export class AuthService {
         name: dto.name,
         passwordHash,
         role: UserRole.GUEST,
+        isHost: false,
       },
     });
 
-    const tokens = await this.issueTokens(user.id, user.email, user.role);
+    const tokens = await this.issueTokens(user.id, user.email, user.role, user.isHost);
     return {
       user: this.toAuthUser(user),
       tokens,
@@ -74,7 +76,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const tokens = await this.issueTokens(user.id, user.email, user.role);
+    const tokens = await this.issueTokens(user.id, user.email, user.role, user.isHost);
     return {
       user: this.toAuthUser(user),
       tokens,
@@ -106,6 +108,7 @@ export class AuthService {
       existing.user.id,
       existing.user.email,
       existing.user.role,
+      existing.user.isHost,
     );
 
     const newTokenHash = this.hashToken(newTokens.refreshToken);
@@ -154,12 +157,51 @@ export class AuthService {
     return this.toAuthUser(user);
   }
 
+  /**
+   * Grant host capability to an authenticated GUEST.
+   *
+   * - Idempotent: if the user already has host capability, returns the current
+   *   state unchanged.
+   * - Never changes `role` (remains GUEST) and never grants ADMIN.
+   * - Issues a fresh token pair so the caller's session reflects the new state
+   *   without requiring a manual logout/login.
+   */
+  async becomeHost(userId: string): Promise<{ user: AuthUserDto; tokens: AuthTokensDto }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.role !== UserRole.GUEST) {
+      throw new ForbiddenException('Only guest accounts can become hosts');
+    }
+    if (user.isHost) {
+      const tokens = await this.issueTokens(user.id, user.email, user.role, user.isHost);
+      return { user: this.toAuthUser(user), tokens };
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { isHost: true },
+    });
+
+    const tokens = await this.issueTokens(
+      updated.id,
+      updated.email,
+      updated.role,
+      updated.isHost,
+    );
+    return { user: this.toAuthUser(updated), tokens };
+  }
+
   private async issueTokens(
     userId: string,
     email: string,
     role: UserRole,
+    isHost: boolean,
   ): Promise<AuthTokensDto> {
-    const payload: JwtPayload = { sub: userId, email, role };
+    const payload: JwtPayload = { sub: userId, email, role, isHost };
     const accessToken = await this.jwtService.signAsync(payload);
 
     const rawRefreshToken = crypto.randomBytes(REFRESH_BYTES).toString('base64url');
@@ -187,6 +229,7 @@ export class AuthService {
       email: user.email,
       name: user.name,
       role: user.role,
+      isHost: user.isHost,
       createdAt: user.createdAt,
     };
   }

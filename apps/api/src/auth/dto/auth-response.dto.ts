@@ -14,6 +14,9 @@ export class AuthUserDto {
   @ApiProperty({ enum: UserRole, description: 'User role' })
   role!: UserRole;
 
+  @ApiProperty({ description: 'Whether the user has host capabilities (independent of role)' })
+  isHost!: boolean;
+
   @ApiProperty({ description: 'Account creation timestamp' })
   createdAt!: Date;
 }
