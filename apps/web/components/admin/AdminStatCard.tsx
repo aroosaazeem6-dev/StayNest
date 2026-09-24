@@ -1,31 +1,61 @@
 import { ReactNode } from 'react';
 
+type AccentKey =
+  | 'forest'
+  | 'sage'
+  | 'amber'
+  | 'red'
+  | 'blue'
+  | 'purple'
+  | 'slate'
+  | 'emerald';
+
 interface AdminStatCardProps {
   label: string;
   value: number | string;
-  accent?: string;
+  accent?: AccentKey;
   icon?: ReactNode;
+  subtitle?: string;
 }
 
-export function AdminStatCard({ label, value, accent = 'brand', icon }: AdminStatCardProps) {
-  const colorMap: Record<string, string> = {
-    brand: 'bg-brand-50 text-brand-700',
-    green: 'bg-green-50 text-green-700',
-    amber: 'bg-amber-50 text-amber-700',
-    red: 'bg-red-50 text-red-700',
-    blue: 'bg-blue-50 text-blue-700',
-    purple: 'bg-purple-50 text-purple-700',
-    slate: 'bg-slate-50 text-slate-700',
-  };
+const accentMap: Record<AccentKey, string> = {
+  forest: 'bg-forest-900/10 text-forest-900',
+  sage: 'bg-sage-600/10 text-sage-700',
+  amber: 'bg-amber-500/10 text-amber-700',
+  red: 'bg-red-500/10 text-red-700',
+  blue: 'bg-blue-500/10 text-blue-700',
+  purple: 'bg-purple-500/10 text-purple-700',
+  slate: 'bg-slate-500/10 text-slate-700',
+  emerald: 'bg-emerald-500/10 text-emerald-700',
+};
+
+export function AdminStatCard({
+  label,
+  value,
+  accent = 'forest',
+  icon,
+  subtitle,
+}: AdminStatCardProps) {
+  const classes = accentMap[accent] ?? accentMap.forest;
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-500">{label}</span>
+    <div className="rounded-xl border border-sage-200/50 bg-white p-5 shadow-sm transition-shadow hover:shadow">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-sage-500">
+            {label}
+          </p>
+          {subtitle && <p className="mt-0.5 text-xs text-sage-400">{subtitle}</p>}
+          <div className="mt-2 text-3xl font-bold text-forest-900">{value}</div>
+        </div>
         {icon && (
-          <span className={`rounded-lg p-2 ${colorMap[accent] ?? colorMap.brand}`}>{icon}</span>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${classes}`}>
+            {icon}
+          </span>
         )}
       </div>
-      <div className="mt-2 text-2xl font-bold text-gray-900">{value}</div>
     </div>
   );
 }
+
+export default AdminStatCard;

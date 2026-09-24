@@ -1,0 +1,94 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { adminService, type AdminUser } from '@/lib/admin-service';
+
+export function UserDetail({ id }: { id: string }) {
+  const router = useRouter();
+  const { tokens } = useAuth();
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [state, setState] = useState<'loading' | 'success' | 'error' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    let mounted = true;
+    setState('loading');
+    adminService
+      .getUser(tokens.accessToken, id)
+      .then((u) => {
+        if (!mounted) return;
+        setUser(u);
+        setState('success');
+      })
+      .catch((err: unknown) => {
+        const e = err as { status?: number; message?: string } | undefined;
+        if (!mounted) return;
+        setState('error');
+        setError(e?.status === 404 ? 'User not found.' : e?.message || 'Unable to load user.');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [id, tokens]);
+
+  if (state === 'loading' || !user) {
+    return <div className="h-64 animate-pulse rounded-xl bg-sage-100" />;
+  }
+
+  if (state === 'error') {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-sm text-red-700">{error}</p>
+        <button onClick={() => router.refresh()} className="btn-primary mt-4">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-sage-200/50 bg-white p-6 shadow-sm">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-medium text-sage-500">ID</dt>
+          <dd className="mt-1 font-mono text-sm text-forest-900">{user.id}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-sage-500">Name</dt>
+          <dd className="mt-1 text-sm text-forest-900">{user.name}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-sage-500">Email</dt>
+          <dd className="mt-1 text-sm text-forest-900">{user.email}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-sage-500">Role</dt>
+          <dd className="mt-1 text-sm text-forest-900">{user.role}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-sage-500">Created</dt>
+          <dd className="mt-1 text-sm text-forest-900">
+            {new Date(user.createdAt).toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-medium text-sage-500">Updated</dt>
+          <dd className="mt-1 text-sm text-forest-900">
+            {new Date(user.updatedAt).toLocaleString()}
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-6">
+        <Link href="/admin/users" className="btn-secondary">
+          Back to users
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export default UserDetail;

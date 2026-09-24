@@ -1,34 +1,17 @@
+'use client';
+
 import { Suspense } from 'react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { UserRole } from '@prisma/client';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
+import { AdminLayout } from '@/components/admin/AdminLayout';
 import { UserManagement } from '@/components/admin/UserManagement';
 
-export const metadata = {
-  title: 'Users — StayNest Admin',
-  description: 'Manage StayNest users and roles.',
-};
+const fallback = <div className="h-96 animate-pulse rounded-xl bg-sage-100" />;
 
 export default function AdminUsersPage() {
   return (
-    <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-      <div className="container-section py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Users</h1>
-          <p className="mt-2 text-gray-600">
-            Browse accounts, search, and update roles.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_1fr]">
-          <AdminSidebar />
-          <div>
-            <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-gray-100" />}>
-              <UserManagement />
-            </Suspense>
-          </div>
-        </div>
-      </div>
-    </ProtectedRoute>
+    <AdminLayout title="Users" subtitle="Browse accounts, search, and update roles.">
+      <Suspense fallback={fallback}>
+        <UserManagement />
+      </Suspense>
+    </AdminLayout>
   );
 }

@@ -19,6 +19,8 @@ export interface AdminDashboardOverview {
     confirmed: number;
     cancelled: number;
     completed: number;
+    hostAccepted: number;
+    hostDeclined: number;
   };
   payments: {
     total: number;
