@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import {
@@ -70,11 +70,13 @@ export class AdminService {
       draftProperties,
       activeProperties,
       archivedProperties,
-      totalBookings,
-      pendingBookings,
-      confirmedBookings,
-      cancelledBookings,
-      completedBookings,
+           totalBookings,
+           pendingBookings,
+           confirmedBookings,
+           cancelledBookings,
+           completedBookings,
+           hostAcceptedBookings,
+           hostDeclinedBookings,
       totalPayments,
       pendingPayments,
       succeededPayments,
@@ -96,6 +98,8 @@ export class AdminService {
       this.prisma.booking.count({ where: { status: BookingStatus.CONFIRMED } }),
       this.prisma.booking.count({ where: { status: BookingStatus.CANCELLED } }),
       this.prisma.booking.count({ where: { status: BookingStatus.COMPLETED } }),
+      this.prisma.booking.count({ where: { status: BookingStatus.HOST_ACCEPTED } }),
+      this.prisma.booking.count({ where: { status: BookingStatus.HOST_DECLINED } }),
       this.prisma.payment.count(),
       this.prisma.payment.count({ where: { status: PaymentStatus.PENDING } }),
       this.prisma.payment.count({ where: { status: PaymentStatus.SUCCEEDED } }),
@@ -157,6 +161,8 @@ export class AdminService {
         confirmed: confirmedBookings,
         cancelled: cancelledBookings,
         completed: completedBookings,
+        hostAccepted: hostAcceptedBookings,
+        hostDeclined: hostDeclinedBookings,
       },
       payments: {
         total: totalPayments,
@@ -496,6 +502,37 @@ export class AdminService {
     id: string,
     dto: UpdateBookingStatusDto,
   ): Promise<AdminBookingResponseDto> {
+    const current = await this.prisma.booking.findUnique({
+      where: { id },
+      select: { id: true, status: true, totalAmount: true },
+    });
+
+    if (!current) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    const VALID_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+      [BookingStatus.PENDING]: [
+        BookingStatus.CONFIRMED,
+        BookingStatus.CANCELLED,
+      ],
+      [BookingStatus.HOST_ACCEPTED]: [
+        BookingStatus.CONFIRMED,
+        BookingStatus.CANCELLED,
+      ],
+      [BookingStatus.HOST_DECLINED]: [BookingStatus.CANCELLED],
+      [BookingStatus.CONFIRMED]: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
+      [BookingStatus.CANCELLED]: [],
+      [BookingStatus.COMPLETED]: [],
+    };
+
+    const allowed = VALID_TRANSITIONS[current.status] ?? [];
+    if (!allowed.includes(dto.status)) {
+      throw new BadRequestException(
+        `Cannot transition booking from ${current.status} to ${dto.status}`,
+      );
+    }
+
     const booking = await this.prisma.booking.update({
       where: { id },
       data: { status: dto.status },

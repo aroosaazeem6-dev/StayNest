@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  isHost: boolean;
   createdAt: string;
 }
 
@@ -26,7 +27,12 @@ export interface AuthState {
 
 const STORAGE_KEY = 'staynest.auth';
 
-/** Read persisted auth state from localStorage (client-side only). */
+/**
+ * Read persisted auth state from localStorage (client-side only).
+ *
+ * Older sessions may predate the isHost field. Normalize defensively so the
+ * rest of the app can rely on a boolean.
+ */
 export function readStoredAuth(): { user: AuthUser | null; tokens: AuthTokens | null } {
   if (typeof window === 'undefined') {
     return { user: null, tokens: null };
@@ -35,8 +41,12 @@ export function readStoredAuth(): { user: AuthUser | null; tokens: AuthTokens | 
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return { user: null, tokens: null };
     const parsed = JSON.parse(raw) as { user: AuthUser | null; tokens: AuthTokens | null };
+    const user = parsed.user ?? null;
+    if (user && (user.isHost === undefined || user.isHost === null)) {
+      user.isHost = false;
+    }
     return {
-      user: parsed.user ?? null,
+      user,
       tokens: parsed.tokens ?? null,
     };
   } catch {

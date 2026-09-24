@@ -136,7 +136,13 @@ describe('BookingService', () => {
       expect(prisma.booking.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+            status: {
+              in: [
+                BookingStatus.PENDING,
+                BookingStatus.HOST_ACCEPTED,
+                BookingStatus.CONFIRMED,
+              ],
+            },
           }),
           select: { id: true },
         }),
@@ -558,6 +564,223 @@ describe('BookingService', () => {
 
       await expect(service.cancel('nonexistent', guestUser)).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  const mockHostBooking = {
+    id: 'bk-1',
+    propertyId: 'prop-1',
+    guestId: 'guest-1',
+    checkIn: new Date('2026-11-01T00:00:00.000Z'),
+    checkOut: new Date('2026-11-05T00:00:00.000Z'),
+    guests: 2,
+    status: BookingStatus.PENDING,
+    totalAmount: new (require('@prisma/client').Prisma.Decimal)(400),
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    property: {
+      id: 'prop-1',
+      title: 'Test Property',
+      propertyType: 'APARTMENT',
+      city: 'Denver',
+      country: 'USA',
+      pricePerNight: new (require('@prisma/client').Prisma.Decimal)(100),
+      hostId: 'host-1',
+      images: [{ url: 'image.jpg' }],
+    },
+    guest: {
+      id: 'guest-1',
+      name: 'Guest User',
+      email: 'guest@test.com',
+    },
+  };
+
+  const guestHostUser: AuthenticatedUser = {
+    id: 'host-1',
+    email: 'host@test.com',
+    role: UserRole.GUEST,
+    isHost: true,
+  };
+
+  const otherHostUser: AuthenticatedUser = {
+    id: 'host-2',
+    email: 'other@test.com',
+    role: UserRole.HOST,
+  };
+
+  describe('findHostRequests', () => {
+    it('returns bookings for properties owned by the host', async () => {
+      prisma.booking.findMany.mockResolvedValue([mockHostBooking]);
+      prisma.booking.count.mockResolvedValue(1);
+
+      const result = await service.findHostRequests(hostUser);
+
+      expect(result.data).toHaveLength(1);
+      expect(prisma.booking.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { property: { hostId: 'host-1' } },
+        }),
+      );
+    });
+
+    it('supports GUEST role with isHost=true', async () => {
+      prisma.booking.findMany.mockResolvedValue([mockHostBooking]);
+      prisma.booking.count.mockResolvedValue(1);
+
+      const result = await service.findHostRequests(guestHostUser);
+
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('supports pagination', async () => {
+      prisma.booking.findMany.mockResolvedValue([mockHostBooking]);
+      prisma.booking.count.mockResolvedValue(25);
+
+      const result = await service.findHostRequests(hostUser, 2, 10);
+
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.totalPages).toBe(3);
+    });
+
+    it('rejects non-host user', async () => {
+      await expect(service.findHostRequests(guestUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('maps response correctly with coverImage', async () => {
+      prisma.booking.findMany.mockResolvedValue([mockHostBooking]);
+      prisma.booking.count.mockResolvedValue(1);
+
+      const result = await service.findHostRequests(hostUser);
+
+      expect(result.data[0].property.coverImage).toBe('image.jpg');
+      expect(result.data[0].guest.name).toBe('Guest User');
+      expect(result.data[0].status).toBe(BookingStatus.PENDING);
+    });
+
+    it('handles missing images', async () => {
+      const bookingNoImage = {
+        ...mockHostBooking,
+        property: {
+          ...mockHostBooking.property,
+          images: [],
+        },
+      };
+      prisma.booking.findMany.mockResolvedValue([bookingNoImage]);
+      prisma.booking.count.mockResolvedValue(1);
+
+      const result = await service.findHostRequests(hostUser);
+
+      expect(result.data[0].property.coverImage).toBeNull();
+    });
+  });
+
+  describe('hostAccept', () => {
+    it('accepts PENDING booking for own property', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockHostBooking);
+      prisma.booking.update.mockResolvedValue({
+        ...mockHostBooking,
+        status: BookingStatus.HOST_ACCEPTED,
+      });
+
+      const result = await service.hostAccept('bk-1', hostUser);
+
+      expect(result.status).toBe(BookingStatus.HOST_ACCEPTED);
+      expect(prisma.booking.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'bk-1' },
+          data: { status: BookingStatus.HOST_ACCEPTED },
+        }),
+      );
+    });
+
+    it('rejects non-host user', async () => {
+      await expect(service.hostAccept('bk-1', guestUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects non-owner host', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockHostBooking);
+
+      await expect(service.hostAccept('bk-1', otherHostUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('throws NotFoundException for nonexistent booking', async () => {
+      prisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.hostAccept('nonexistent', hostUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('rejects booking not in PENDING status', async () => {
+      const acceptedBooking = {
+        ...mockHostBooking,
+        status: BookingStatus.HOST_ACCEPTED,
+      };
+      prisma.booking.findUnique.mockResolvedValue(acceptedBooking);
+
+      await expect(service.hostAccept('bk-1', hostUser)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('hostDecline', () => {
+    it('declines PENDING booking for own property', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockHostBooking);
+      prisma.booking.update.mockResolvedValue({
+        ...mockHostBooking,
+        status: BookingStatus.HOST_DECLINED,
+      });
+
+      const result = await service.hostDecline('bk-1', hostUser);
+
+      expect(result.status).toBe(BookingStatus.HOST_DECLINED);
+      expect(prisma.booking.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'bk-1' },
+          data: { status: BookingStatus.HOST_DECLINED },
+        }),
+      );
+    });
+
+    it('rejects non-host user', async () => {
+      await expect(service.hostDecline('bk-1', guestUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('rejects non-owner host', async () => {
+      prisma.booking.findUnique.mockResolvedValue(mockHostBooking);
+
+      await expect(service.hostDecline('bk-1', otherHostUser)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('throws NotFoundException for nonexistent booking', async () => {
+      prisma.booking.findUnique.mockResolvedValue(null);
+
+      await expect(service.hostDecline('nonexistent', hostUser)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('rejects booking not in PENDING status', async () => {
+      const confirmedBooking = {
+        ...mockHostBooking,
+        status: BookingStatus.CONFIRMED,
+      };
+      prisma.booking.findUnique.mockResolvedValue(confirmedBooking);
+
+      await expect(service.hostDecline('bk-1', hostUser)).rejects.toThrow(
+        BadRequestException,
       );
     });
   });

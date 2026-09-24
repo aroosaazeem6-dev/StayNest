@@ -20,8 +20,8 @@ export function PropertyCard({ property }: PropertyCardProps) {
     : [];
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md">
-      <div className="relative aspect-[4/3] bg-gray-200">
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-[#DDE3DA] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition hover:shadow-[0_4px_6px_rgba(0,0,0,0.05)]">
+      <div className="relative aspect-[4/3] bg-[#E8E6DF]">
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -31,7 +31,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
+          <div className="flex h-full w-full items-center justify-center text-sm text-[#6B756E]">
             StayNest
           </div>
         )}
@@ -39,19 +39,19 @@ export function PropertyCard({ property }: PropertyCardProps) {
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate text-base font-semibold text-gray-900">
+          <h3 className="truncate text-base font-semibold text-[#26332D]">
             {property.title}
           </h3>
-          <span className="shrink-0 text-sm font-semibold text-gray-900">
+          <span className="shrink-0 text-sm font-semibold text-[#26332D]">
             ${property.pricePerNight}
-            <span className="font-normal text-gray-500"> / night</span>
+            <span className="font-normal text-[#6B756E]"> / night</span>
           </span>
         </div>
 
-        <p className="mt-1 truncate text-sm text-gray-500">{location}</p>
+        <p className="mt-1 truncate text-sm text-[#6B756E]">{location}</p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-          <span className="rounded-md bg-gray-100 px-2 py-1">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#6B756E]">
+          <span className="rounded-md bg-[#EAF1E7] px-2 py-1 text-[#405546]">
             {property.propertyType}
           </span>
           <span>Up to {property.maxGuests} guests</span>
@@ -65,7 +65,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
             {amenityNames.map((name) => (
               <span
                 key={name}
-                className="rounded-md bg-brand-50 px-2 py-1 text-xs text-brand-700"
+                className="rounded-md bg-[#EAF1E7] px-2 py-1 text-xs text-[#405546]"
               >
                 {name}
               </span>

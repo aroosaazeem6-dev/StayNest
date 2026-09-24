@@ -24,6 +24,7 @@ interface AuthContextValue extends AuthState {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  becomeHost: () => Promise<AuthUser | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -40,7 +41,7 @@ export function useAuth(): AuthContextValue {
 function roleHomePath(role: UserRole | undefined): string {
   switch (role) {
     case UserRole.GUEST:
-      return '/bookings';
+      return '/dashboard';
     case UserRole.HOST:
       return '/host';
     case UserRole.ADMIN:
@@ -138,6 +139,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [tokens]);
 
+  /**
+   * Grant host capability to the authenticated guest.
+   *
+   * Calls POST /api/v1/auth/become-host, which is idempotent and returns the
+   * updated user plus a fresh token pair. Local state and persisted storage
+   * are updated so the rest of the app observes isHost=true immediately.
+   *
+   * Returns the updated user so callers can branch on the new state.
+   */
+  const becomeHost = useCallback(async (): Promise<AuthUser | null> => {
+    if (!tokens?.accessToken) return null;
+    try {
+      const res = await authService.becomeHost(tokens.accessToken);
+      setAuth(res.user, res.tokens);
+      return res.user;
+    } catch {
+      // Failure is surfaced to the caller; local state is intentionally left
+      // unchanged so the UI can show an error without losing the session.
+      return null;
+    }
+  }, [tokens, setAuth]);
+
   const value: AuthContextValue = {
     user,
     tokens,
@@ -147,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refreshUser,
+    becomeHost,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

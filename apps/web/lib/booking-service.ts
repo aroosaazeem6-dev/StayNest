@@ -61,6 +61,46 @@ export interface BookingListResponse {
   meta: PaginationMeta;
 }
 
+/** Mirrors HostBookingPropertyDto from the backend. */
+export interface HostBookingProperty {
+  id: string;
+  title: string;
+  propertyType: string;
+  city: string | null;
+  country: string | null;
+  pricePerNight: number;
+  coverImage: string | null;
+}
+
+/** Mirrors HostBookingGuestDto from the backend. */
+export interface HostBookingGuest {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** Mirrors HostBookingResponseDto from the backend. */
+export interface HostBooking {
+  id: string;
+  propertyId: string;
+  guestId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  status: string;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  property: HostBookingProperty;
+  guest: HostBookingGuest;
+}
+
+/** Mirrors HostBookingListResponseDto from the backend. */
+export interface HostBookingListResponse {
+  data: HostBooking[];
+  meta: PaginationMeta;
+}
+
 /**
  * Thin service layer over the booking API.
  *
@@ -81,6 +121,43 @@ export const bookingService = {
         method: 'POST',
         body: JSON.stringify(body),
       },
+      accessToken,
+    );
+  },
+
+  async findHostRequests(
+    accessToken: string,
+    page = 1,
+    limit = 10,
+  ): Promise<HostBookingListResponse> {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', String(limit));
+    return apiClient.request<HostBookingListResponse>(
+      `/bookings/host/requests?${params.toString()}`,
+      {},
+      accessToken,
+    );
+  },
+
+  async hostAccept(
+    id: string,
+    accessToken: string,
+  ): Promise<HostBooking> {
+    return apiClient.request<HostBooking>(
+      `/bookings/${id}/host-accept`,
+      { method: 'PATCH' },
+      accessToken,
+    );
+  },
+
+  async hostDecline(
+    id: string,
+    accessToken: string,
+  ): Promise<HostBooking> {
+    return apiClient.request<HostBooking>(
+      `/bookings/${id}/host-decline`,
+      { method: 'PATCH' },
       accessToken,
     );
   },

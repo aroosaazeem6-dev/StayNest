@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminService } from './admin.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UserRole, PaymentStatus } from '@prisma/client';
 import { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
@@ -300,6 +300,8 @@ beforeEach(async () => {
     expect(result.users).toBe(mockUsers.length);
     expect(result.properties).toBe(mockProperties.length);
     expect(result.bookings.total).toBe(mockBookings.length);
+    expect(result.bookings.hostAccepted).toBeDefined();
+    expect(result.bookings.hostDeclined).toBeDefined();
   });
 
   it('property status counts are correct', async () => {
@@ -529,6 +531,48 @@ beforeEach(async () => {
     expect(prisma.booking.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'bk-1' }, data: { status: 'CANCELLED' } }),
     );
+  });
+
+  it('rejects invalid transition COMPLETED -> PENDING', async () => {
+    prisma.booking.findUnique.mockResolvedValue({
+      id: 'bk-1',
+      status: 'COMPLETED',
+      totalAmount: 1000,
+    });
+    await expect(
+      service.updateBookingStatus('bk-1', { status: 'PENDING' as any }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('allows PENDING -> CONFIRMED transition', async () => {
+    prisma.booking.findUnique.mockResolvedValue({
+      id: 'bk-1',
+      status: 'PENDING',
+      totalAmount: 1000,
+    });
+    const result = await service.updateBookingStatus('bk-1', {
+      status: 'CONFIRMED' as any,
+    });
+    expect(result.status).toBe('CANCELLED');
+  });
+
+  it('allows HOST_ACCEPTED -> CONFIRMED transition', async () => {
+    prisma.booking.findUnique.mockResolvedValue({
+      id: 'bk-1',
+      status: 'HOST_ACCEPTED',
+      totalAmount: 1000,
+    });
+    const result = await service.updateBookingStatus('bk-1', {
+      status: 'CONFIRMED' as any,
+    });
+    expect(result.status).toBe('CANCELLED');
+  });
+
+  it('throws NotFoundException for nonexistent booking on status update', async () => {
+    prisma.booking.findUnique.mockResolvedValue(null);
+    await expect(
+      service.updateBookingStatus('nonexistent', { status: 'CONFIRMED' as any }),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('sensitive fields are not included in returned booking data', async () => {

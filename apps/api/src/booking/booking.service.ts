@@ -12,18 +12,38 @@ import {
   BookingStatus,
   Property,
   PropertyStatus,
+  User,
   UserRole,
   Prisma,
 } from '@prisma/client';
 import { CheckAvailabilityDto } from './dto/check-availability.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
-import { BookingListResponseDto } from './dto/booking-list-response.dto';
-import { PaginationMetaDto } from './dto/booking-list-response.dto';
+import { BookingListResponseDto, PaginationMetaDto } from './dto/booking-list-response.dto';
+import { HostBookingResponseDto } from './dto/host-booking-response.dto';
+import { HostBookingListResponseDto } from './dto/host-booking-list-response.dto';
 
 type BookingWithProperty = Booking & {
   property: Pick<Property, 'id' | 'title' | 'propertyType' | 'city' | 'country' | 'pricePerNight' | 'hostId'>;
 };
+
+type BookingWithGuestAndProperty = Booking & {
+  property: Pick<
+    Property,
+    'id' | 'title' | 'propertyType' | 'city' | 'country' | 'pricePerNight' | 'hostId'
+  > & { images?: { url: string | null }[] };
+  guest: Pick<User, 'id' | 'name' | 'email'>;
+};
+
+const HOST_BLOCKING_STATUSES = [
+  BookingStatus.PENDING,
+  BookingStatus.HOST_ACCEPTED,
+  BookingStatus.CONFIRMED,
+];
+
+function isHostUser(user: AuthenticatedUser): boolean {
+  return user.role === UserRole.HOST || user.isHost === true;
+}
 
 @Injectable()
 export class BookingService {
@@ -54,7 +74,7 @@ export class BookingService {
     const overlapping = await this.prisma.booking.findFirst({
       where: {
         propertyId,
-        status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+        status: { in: HOST_BLOCKING_STATUSES },
         checkIn: { lt: checkOutDate },
         checkOut: { gt: checkInDate },
       },
@@ -102,7 +122,7 @@ export class BookingService {
       const overlapping = await tx.booking.findFirst({
         where: {
           propertyId: dto.propertyId,
-          status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+          status: { in: HOST_BLOCKING_STATUSES },
           checkIn: { lt: checkOutDate },
           checkOut: { gt: checkInDate },
         },
@@ -114,14 +134,14 @@ export class BookingService {
       }
 
       return tx.booking.create({
-          data: {
-            propertyId: dto.propertyId,
-            guestId: guest.id,
-            checkIn: checkInDate,
-            checkOut: checkOutDate,
-            guests: dto.guests,
-            totalAmount: new Prisma.Decimal(totalAmount),
-          },
+        data: {
+          propertyId: dto.propertyId,
+          guestId: guest.id,
+          checkIn: checkInDate,
+          checkOut: checkOutDate,
+          guests: dto.guests,
+          totalAmount: new Prisma.Decimal(totalAmount),
+        },
         include: {
           property: {
             select: {
@@ -188,6 +208,243 @@ export class BookingService {
     };
   }
 
+  /**
+   * List booking requests for properties owned by the authenticated host.
+   * Host capability: role === HOST (legacy) OR isHost === true (GUEST-host).
+   * Only returns bookings where the property's hostId matches the requesting user.
+   */
+  async findHostRequests(
+    host: AuthenticatedUser,
+    page = 1,
+    limit = 10,
+  ): Promise<HostBookingListResponseDto> {
+    if (!isHostUser(host)) {
+      throw new ForbiddenException('Only hosts can view booking requests');
+    }
+
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(50, Math.max(1, limit));
+    const skip = (safePage - 1) * safeLimit;
+
+    const [bookings, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: {
+          property: { hostId: host.id },
+        },
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          property: {
+            select: {
+              id: true,
+              title: true,
+              propertyType: true,
+              city: true,
+              country: true,
+              pricePerNight: true,
+              hostId: true,
+              images: {
+                take: 1,
+                select: { url: true },
+                orderBy: { createdAt: 'asc' },
+              },
+            },
+          },
+          guest: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      }),
+      this.prisma.booking.count({
+        where: { property: { hostId: host.id } },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / safeLimit);
+
+    return {
+      data: bookings.map((b) => this.toHostResponseDto(b)),
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages,
+        hasNext: safePage < totalPages,
+        hasPrev: safePage > 1,
+      } as PaginationMetaDto,
+    };
+  }
+
+  /**
+   * Accept a PENDING booking request — only the property owner/host may accept.
+   * Transitions PENDING → HOST_ACCEPTED (awaiting admin approval).
+   * Does NOT transition to CONFIRMED.
+   */
+  async hostAccept(
+    id: string,
+    host: AuthenticatedUser,
+  ): Promise<HostBookingResponseDto> {
+    if (!isHostUser(host)) {
+      throw new ForbiddenException('Only hosts can accept booking requests');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+            images: {
+              take: 1,
+              select: { url: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        guest: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.property.hostId !== host.id) {
+      throw new ForbiddenException(
+        'You do not have permission to accept this booking request',
+      );
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException(
+        `Booking cannot be accepted from status ${booking.status}`,
+      );
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.HOST_ACCEPTED },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+            images: {
+              take: 1,
+              select: { url: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        guest: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return this.toHostResponseDto(updated);
+  }
+
+  /**
+   * Decline a PENDING booking request — only the property owner/host may decline.
+   * Transitions PENDING → HOST_DECLINED (terminal).
+   */
+  async hostDecline(
+    id: string,
+    host: AuthenticatedUser,
+  ): Promise<HostBookingResponseDto> {
+    if (!isHostUser(host)) {
+      throw new ForbiddenException('Only hosts can decline booking requests');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+            images: {
+              take: 1,
+              select: { url: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        guest: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.property.hostId !== host.id) {
+      throw new ForbiddenException(
+        'You do not have permission to decline this booking request',
+      );
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException(
+        `Booking cannot be declined from status ${booking.status}`,
+      );
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.HOST_DECLINED },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+            images: {
+              take: 1,
+              select: { url: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+        },
+        guest: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    return this.toHostResponseDto(updated);
+  }
+
   async findOne(
     id: string,
     requestingUser?: AuthenticatedUser,
@@ -214,7 +471,10 @@ export class BookingService {
     }
 
     const isGuest = requestingUser?.id === booking.guestId;
-    const isHost = requestingUser?.role === UserRole.HOST && requestingUser.id === booking.property.hostId;
+    const isHost =
+      requestingUser != null &&
+      isHostUser(requestingUser) &&
+      requestingUser.id === booking.property.hostId;
     const isAdmin = requestingUser?.role === UserRole.ADMIN;
 
     if (!isGuest && !isHost && !isAdmin) {
@@ -258,7 +518,9 @@ export class BookingService {
     }
 
     const isGuest = requestingUser.id === booking.guestId;
-    const isHost = requestingUser.role === UserRole.HOST && requestingUser.id === booking.property.hostId;
+    const isHost =
+      isHostUser(requestingUser) &&
+      requestingUser.id === booking.property.hostId;
     const isAdmin = requestingUser.role === UserRole.ADMIN;
 
     if (!isGuest && !isHost && !isAdmin) {
@@ -342,6 +604,37 @@ export class BookingService {
         country: booking.property.country,
         pricePerNight: Number(booking.property.pricePerNight),
         hostId: booking.property.hostId,
+      },
+    };
+  }
+
+  private toHostResponseDto(
+    booking: BookingWithGuestAndProperty,
+  ): HostBookingResponseDto {
+    return {
+      id: booking.id,
+      propertyId: booking.propertyId,
+      guestId: booking.guestId,
+      checkIn: this.toIsoDateString(booking.checkIn),
+      checkOut: this.toIsoDateString(booking.checkOut),
+      guests: booking.guests,
+      status: booking.status,
+      totalAmount: Number(booking.totalAmount),
+      createdAt: booking.createdAt.toISOString(),
+      updatedAt: booking.updatedAt.toISOString(),
+      property: {
+        id: booking.property.id,
+        title: booking.property.title,
+        propertyType: booking.property.propertyType,
+        city: booking.property.city,
+        country: booking.property.country,
+        pricePerNight: Number(booking.property.pricePerNight),
+        coverImage: booking.property.images?.[0]?.url ?? null,
+      },
+      guest: {
+        id: booking.guest.id,
+        name: booking.guest.name,
+        email: booking.guest.email,
       },
     };
   }

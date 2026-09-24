@@ -59,14 +59,14 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
     (query.amenityIds && query.amenityIds.length > 0);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-[#DDE3DA] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+        <h2 className="text-base font-semibold text-[#26332D]">Filters</h2>
         <button
           type="button"
           onClick={onClear}
           disabled={!hasFilters}
-          className="text-xs font-medium text-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="text-xs font-medium text-[#879B89] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Clear all
         </button>
@@ -74,7 +74,7 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
 
       <div className="mt-4 space-y-4">
         <div>
-          <label htmlFor="city" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="city" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Destination / City
           </label>
           <input
@@ -84,12 +84,12 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
             onChange={(e) => setDraft({ ...draft, city: e.target.value })}
             onKeyDown={handleKeyDown}
             placeholder="e.g. Aspen"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
           />
         </div>
 
         <div>
-          <label htmlFor="country" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="country" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Country
           </label>
           <input
@@ -99,12 +99,12 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
             onChange={(e) => setDraft({ ...draft, country: e.target.value })}
             onKeyDown={handleKeyDown}
             placeholder="e.g. USA"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
           />
         </div>
 
         <div>
-          <label htmlFor="propertyType" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="propertyType" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Property type
           </label>
           <select
@@ -210,7 +210,7 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
         </div>
 
         <div>
-          <label htmlFor="sort" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="sort" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Sort by
           </label>
           <select
@@ -222,7 +222,7 @@ export function PropertyFilters({ query, onChange, onClear }: PropertyFiltersPro
               // Sort commits immediately for a responsive UI.
               onChange({ ...next, page: 1 });
             }}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
           >
             <option value="">Newest</option>
             {SORT_OPTIONS.map((opt) => (

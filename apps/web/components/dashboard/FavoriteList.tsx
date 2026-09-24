@@ -83,7 +83,7 @@ export function FavoriteList() {
 
   if (state.status === 'error') {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
         <p className="text-sm text-red-700">{state.error}</p>
         <button
           onClick={() => setState((s) => ({ ...s, status: 'loading' }))}
@@ -97,12 +97,20 @@ export function FavoriteList() {
 
   if (state.status === 'empty' || !state.data) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-gray-700">No saved stays yet.</p>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="rounded-2xl border border-[#DDE3DA] bg-white p-12 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EAF1E7] text-[#879B89]">
+          <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth="1.6">
+            <path
+              d="M20.8 8.8c0 5.5-8.8 10.2-8.8 10.2S3.2 14.3 3.2 8.8A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        <p className="mt-4 text-base font-medium text-[#26332D]">No saved stays yet</p>
+        <p className="mt-1 text-sm text-[#6B756E]">
           Explore properties and tap the heart to save your favorites.
         </p>
-        <Link href="/properties" className="btn-primary mt-4">
+        <Link href="/properties" className="btn-primary mt-5">
           Explore stays
         </Link>
       </div>

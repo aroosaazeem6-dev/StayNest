@@ -53,9 +53,9 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
 
   if (state.status === 'error') {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
-        <h2 className="text-xl font-bold text-gray-900">{state.message}</h2>
-        <p className="mt-2 text-sm text-gray-500">
+      <div className="rounded-2xl border border-[#DDE3DA] bg-white p-10 text-center">
+        <h2 className="text-xl font-bold text-[#26332D]">{state.message}</h2>
+        <p className="mt-2 text-sm text-[#6B756E]">
           The property you are looking for does not exist or is not available.
         </p>
         <Link href="/properties" className="btn-primary mt-4">
@@ -72,7 +72,7 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
       <div className="mb-6">
         <Link
           href="/properties"
-          className="text-sm font-medium text-brand-600 hover:underline"
+          className="text-sm font-medium text-[#879B89] hover:underline"
         >
           &larr; Back to properties
         </Link>
@@ -80,14 +80,14 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+          <h1 className="text-2xl font-bold text-[#26332D] sm:text-3xl">
             {property.title}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-[#6B756E]">
             {[property.city, property.country].filter(Boolean).join(', ') ||
               'Location TBA'}
           </p>
-          <span className="mt-2 inline-block rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+          <span className="mt-2 inline-block rounded-md bg-[#EAF1E7] px-2 py-1 text-xs text-[#405546]">
             {property.propertyType}
           </span>
         </div>
@@ -107,7 +107,7 @@ export function PropertyDetailsView({ propertyId }: PropertyDetailsViewProps) {
       </div>
 
       <div className="mt-12">
-        <h2 className="mb-4 text-xl font-bold text-gray-900">Reviews</h2>
+        <h2 className="mb-4 text-xl font-bold text-[#26332D]">Reviews</h2>
         <ReviewList propertyId={property.id} />
       </div>
     </div>
@@ -119,7 +119,7 @@ function PropertyGallery({ property }: { property: Property }) {
   const primary = images.find((img) => img.url) ?? images[0];
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gray-100">
+    <div className="overflow-hidden rounded-2xl border border-[#DDE3DA] bg-[#E8E6DF]">
       {primary?.url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -128,7 +128,7 @@ function PropertyGallery({ property }: { property: Property }) {
           className="h-full w-full object-cover"
         />
       ) : (
-        <div className="flex aspect-[4/3] items-center justify-center text-sm text-gray-400">
+        <div className="flex aspect-[4/3] items-center justify-center text-sm text-[#6B756E]">
           StayNest
         </div>
       )}
@@ -139,13 +139,13 @@ function PropertyGallery({ property }: { property: Property }) {
 function PropertyDetailsSkeleton() {
   return (
     <div>
-      <div className="mb-6 h-4 w-28 animate-pulse rounded bg-gray-200" />
+      <div className="mb-6 h-4 w-28 animate-pulse rounded bg-[#E8E6DF]" />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <div className="aspect-[4/3] animate-pulse rounded-xl bg-gray-200" />
+        <div className="aspect-[4/3] animate-pulse rounded-2xl bg-[#E8E6DF]" />
         <div className="space-y-4">
-          <div className="h-8 w-2/3 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200" />
-          <div className="h-24 w-full animate-pulse rounded-xl bg-gray-200" />
+          <div className="h-8 w-2/3 animate-pulse rounded bg-[#E8E6DF]" />
+          <div className="h-4 w-1/2 animate-pulse rounded bg-[#E8E6DF]" />
+          <div className="h-24 w-full animate-pulse rounded-2xl bg-[#E8E6DF]" />
         </div>
       </div>
     </div>

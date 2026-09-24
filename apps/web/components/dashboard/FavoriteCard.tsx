@@ -13,18 +13,18 @@ export function FavoriteCard({ favorite, onRemove, removing }: FavoriteCardProps
   const { property } = favorite;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex aspect-[4/3] items-center justify-center bg-gray-100 text-sm text-gray-400">
+    <div className="overflow-hidden rounded-2xl border border-[#DDE3DA] bg-white shadow-sm">
+      <div className="flex aspect-[4/3] items-center justify-center bg-[#EAF1E7] text-sm text-[#879B89]">
         StayNest
       </div>
       <div className="p-4">
-        <h3 className="truncate text-base font-semibold text-gray-900">
+        <h3 className="truncate text-base font-semibold text-[#26332D]">
           {property.title}
         </h3>
-        <p className="mt-1 truncate text-sm text-gray-500">
+        <p className="mt-1 truncate text-sm text-[#6B756E]">
           {[property.city, property.country].filter(Boolean).join(', ') || 'Location TBA'}
         </p>
-        <span className="mt-2 inline-block rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">
+        <span className="mt-2 inline-block rounded-md bg-[#EAF1E7] px-2 py-1 text-xs text-[#879B89]">
           {property.propertyType}
         </span>
         <div className="mt-4 flex items-center gap-2">
@@ -37,7 +37,7 @@ export function FavoriteCard({ favorite, onRemove, removing }: FavoriteCardProps
           <button
             onClick={() => onRemove(property.id)}
             disabled={removing}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm font-medium text-[#6B756E] hover:bg-[#F5F4EF] disabled:opacity-50"
             aria-label="Remove from favorites"
           >
             {removing ? '…' : 'Remove'}

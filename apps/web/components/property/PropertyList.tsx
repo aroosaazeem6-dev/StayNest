@@ -102,7 +102,7 @@ export function PropertyList({ searchParams }: PropertyListProps) {
 
   if (status === 'error') {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
         <p className="text-sm text-red-700">
           {error?.message || 'Unable to load properties.'}
         </p>
@@ -118,12 +118,18 @@ export function PropertyList({ searchParams }: PropertyListProps) {
 
   if (properties.length === 0) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white p-10 text-center">
-        <p className="text-gray-700">No stays found</p>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="rounded-2xl border border-[#DDE3DA] bg-white p-12 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EAF1E7] text-[#879B89]">
+          <svg viewBox="0 0 24 24" fill="none" className="h-7 w-7" stroke="currentColor" strokeWidth="1.6">
+            <path d="m3 10 9-7 9 7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 9v11h14V9M9 20v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <p className="mt-4 text-base font-medium text-[#26332D]">No stays found</p>
+        <p className="mt-1 text-sm text-[#6B756E]">
           Try adjusting your filters or clearing them to see all properties.
         </p>
-        <Link href="/properties" className="btn-primary mt-4">
+        <Link href="/properties" className="btn-primary mt-5">
           Clear filters
         </Link>
       </div>
@@ -164,15 +170,15 @@ export function PropertyList({ searchParams }: PropertyListProps) {
 function PropertyListSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
-      <div className="h-[200px] animate-pulse rounded-xl bg-gray-100" />
+      <div className="h-[200px] animate-pulse rounded-2xl border border-[#DDE3DA] bg-white" />
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="aspect-[4/3] animate-pulse bg-gray-200" />
+          <div key={i} className="overflow-hidden rounded-2xl border border-[#DDE3DA] bg-white">
+            <div className="aspect-[4/3] animate-pulse bg-[#E8E6DF]" />
             <div className="p-4">
-              <div className="h-4 w-2/3 animate-pulse rounded bg-gray-200" />
-              <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-gray-200" />
-              <div className="mt-4 h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+              <div className="h-4 w-2/3 animate-pulse rounded bg-[#E8E6DF]" />
+              <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-[#E8E6DF]" />
+              <div className="mt-4 h-3 w-1/2 animate-pulse rounded bg-[#E8E6DF]" />
             </div>
           </div>
         ))}

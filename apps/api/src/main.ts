@@ -15,30 +15,13 @@ async function bootstrap(): Promise<void> {
   // Security: Helmet for HTTP headers
   app.use(helmet());
 
-  // CORS: configurable via the CORS_ORIGIN environment variable
-  // (comma-separated list of allowed origins, e.g.
-  // "http://localhost:3000,http://localhost:3001,http://localhost:3002").
-  // credentials: true is preserved, so the wildcard "*" is intentionally
-  // avoided — browsers reject wildcard origins when credentials are enabled.
-  //
-  // When CORS_ORIGIN is unset we fall back to a development default that
-  // covers the common local Next.js dev ports (3001/3002). This keeps the
-  // dev workflow working when the frontend port shifts, without hardcoding a
-  // single port and without ever using a wildcard. In production, CORS_ORIGIN
-  // MUST be set explicitly (the fallback is only used in development/test).
-  const corsOriginRaw = configService.get<string>('CORS_ORIGIN');
-  const nodeEnv = configService.get<string>('NODE_ENV') ?? 'development';
-  const corsOrigin = corsOriginRaw
-    ? corsOriginRaw.split(',').map((o) => o.trim()).filter(Boolean)
-    : nodeEnv === 'production'
-      ? []
-      : [
-          'http://localhost:3000',
-          'http://localhost:3001',
-          'http://localhost:3002',
-        ];
+  // CORS: allow local frontend development ports
   app.enableCors({
-    origin: corsOrigin,
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+    ],
     credentials: true,
   });
 
@@ -77,6 +60,7 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = configService.get<number>('port') ?? 3000;
+
   await app.listen(port);
 
   console.log(`StayNest API running on http://localhost:${port}`);

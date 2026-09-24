@@ -61,6 +61,22 @@ export const authService = {
   async me(accessToken: string): Promise<AuthUser> {
     return apiClient.request<AuthUser>('/auth/me', {}, accessToken);
   },
+
+  /**
+   * Grant host capability to the authenticated guest.
+   * Endpoint: POST /api/v1/auth/become-host -> AuthResponseDto
+   *
+   * Idempotent: if the user already has host capability the backend returns
+   * the current state unchanged. The response includes a fresh token pair so
+   * the session reflects the new state without a manual logout/login.
+   */
+  async becomeHost(accessToken: string): Promise<AuthResponse> {
+    return apiClient.request<AuthResponse>(
+      '/auth/become-host',
+      { method: 'POST' },
+      accessToken,
+    );
+  },
 };
 
 export default authService;

@@ -46,6 +46,13 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
 
+  /** Tomorrow's date as an ISO date string (YYYY-MM-DD). */
+  const tomorrowStr = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
   const nights = (() => {
     if (!checkIn || !checkOut) return 0;
     const a = new Date(`${checkIn}T00:00:00`);
@@ -233,12 +240,12 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
         : 'Sign up as guest to book';
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-900">Book this stay</h3>
+    <div className="rounded-2xl border border-[#DDE3DA] bg-white p-6 shadow-sm">
+      <h3 className="text-lg font-semibold text-[#26332D]">Book this stay</h3>
 
       <div className="mt-4 space-y-4">
         <div>
-          <label htmlFor="checkIn" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="checkIn" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Check-in
           </label>
           <input
@@ -251,26 +258,26 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
               setAvailability('idle');
               setDateError(null);
             }}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
             disabled={submitting}
           />
         </div>
 
         <div>
-          <label htmlFor="checkOut" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="checkOut" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Check-out
           </label>
           <input
             id="checkOut"
             type="date"
-            min={checkIn || todayStr}
             value={checkOut}
+            min={tomorrowStr}
             onChange={(e) => {
               setCheckOut(e.target.value);
               setAvailability('idle');
               setDateError(null);
             }}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
             disabled={submitting}
           />
         </div>
@@ -278,14 +285,14 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
         {dateError && <p className="text-xs text-red-600">{dateError}</p>}
 
         <div>
-          <label htmlFor="guests" className="mb-1 block text-xs font-medium text-gray-500">
+          <label htmlFor="guests" className="mb-1 block text-xs font-medium text-[#6B756E]">
             Guests (max {maxGuests})
           </label>
           <select
             id="guests"
             value={guests}
             onChange={(e) => setGuests(Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+            className="w-full rounded-lg border border-[#DDE3DA] px-3 py-2 text-sm outline-none focus:border-[#879B89] focus:ring-1 focus:ring-[#879B89]"
             disabled={submitting}
           >
             {Array.from({ length: maxGuests }, (_, i) => i + 1).map((n) => (
@@ -308,12 +315,12 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
         <AvailabilityMessage status={availability} message={availabilityMessage} />
 
         {nights > 0 && (
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
-            <span className="text-gray-600">
+          <div className="flex items-center justify-between rounded-lg bg-[#F5F4EF] px-3 py-2 text-sm">
+            <span className="text-[#6B756E]">
               {nights} night{nights === 1 ? '' : 's'}
             </span>
-            <span className="font-semibold text-gray-900">
-              ${estimatedTotal} <span className="font-normal text-gray-500">est.</span>
+            <span className="font-semibold text-[#26332D]">
+              ${estimatedTotal} <span className="font-normal text-[#6B756E]">est.</span>
             </span>
           </div>
         )}
@@ -325,7 +332,7 @@ export function BookingCard({ property, onBookingCreated }: BookingCardProps) {
         )}
 
         {user && user.role !== UserRole.GUEST && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[#6B756E]">
             Only guest accounts can create bookings.
           </p>
         )}

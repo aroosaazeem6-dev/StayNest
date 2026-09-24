@@ -7,6 +7,15 @@ import { useAuth } from '@/components/auth/AuthProvider';
 
 type FieldErrors = Partial<Record<'email' | 'password', string>>;
 
+function Logo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={`h-6 w-6 ${className}`} stroke="currentColor" strokeWidth="1.8">
+      <path d="m3 11 9-8 9 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 10v10h14V10M9 20v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAuth();
@@ -17,7 +26,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  // Already authenticated users should not need to see the login page.
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       router.replace('/');
@@ -62,9 +70,9 @@ export default function LoginPage() {
 
   if (isLoading || isAuthenticated) {
     return (
-      <div className="container-section flex min-h-[60vh] items-center justify-center py-16">
-        <div className="flex flex-col items-center gap-3 text-gray-500">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-600" />
+      <div className="flex min-h-screen items-center justify-center bg-warm-100 py-16">
+        <div className="flex flex-col items-center gap-3 text-sage-400">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-sage-200 border-t-forest-900" />
           <span className="text-sm">Loading…</span>
         </div>
       </div>
@@ -72,10 +80,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container-section py-16">
-      <div className="mx-auto max-w-md">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Login</h1>
-        <p className="mt-2 text-gray-600">
+    <div className="flex min-h-screen items-center justify-center bg-warm-100 py-12">
+      <div className="w-full max-w-md rounded-2xl border border-sage-200/50 bg-white p-8 shadow-[0_4px_20px_rgba(38,51,45,0.05)]">
+        {/* Brand */}
+        <div className="mb-8 flex items-center justify-center gap-2">
+          <Logo className="text-forest-900" />
+          <span className="text-2xl font-bold text-forest-900">StayNest</span>
+        </div>
+
+        <h1 className="text-2xl font-bold tracking-tight text-forest-900">
+          Welcome back
+        </h1>
+        <p className="mt-1.5 text-sm text-sage-500">
           Sign in to manage your bookings and saved favorites.
         </p>
 
@@ -88,11 +104,11 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5" noValidate>
           <div>
             <label
               htmlFor="email"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-sm font-medium text-forest-900"
             >
               Email
             </label>
@@ -102,8 +118,8 @@ export default function LoginPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               disabled={submitting}
+              className="w-full rounded-lg border border-sage-200 bg-warm-50 px-3 py-2.5 text-sm text-forest-900 placeholder-sage-400 focus:border-sage-500 focus:ring-sage-500"
             />
             {fieldErrors.email && (
               <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
@@ -113,7 +129,7 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="password"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1.5 block text-sm font-medium text-forest-900"
             >
               Password
             </label>
@@ -123,22 +139,29 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
               disabled={submitting}
+              className="w-full rounded-lg border border-sage-200 bg-warm-50 px-3 py-2.5 text-sm text-forest-900 placeholder-sage-400 focus:border-sage-500 focus:ring-sage-500"
             />
             {fieldErrors.password && (
               <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
             )}
           </div>
 
-          <button type="submit" className="btn-primary w-full" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Login'}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="btn-primary w-full"
+          >
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-sage-500">
           Don&#39;t have an account?{' '}
-          <Link href="/register" className="font-medium text-brand-600">
+          <Link
+            href="/register"
+            className="font-medium text-sage-600 hover:text-forest-900"
+          >
             Register
           </Link>
         </p>

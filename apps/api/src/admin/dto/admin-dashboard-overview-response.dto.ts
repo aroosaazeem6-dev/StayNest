@@ -26,6 +26,12 @@ export class AdminBookingStatsDto {
 
   @ApiProperty({ description: 'Completed bookings', example: 15 })
   completed!: number;
+
+  @ApiProperty({ description: 'Host-accepted bookings', example: 5 })
+  hostAccepted!: number;
+
+  @ApiProperty({ description: 'Host-declined bookings', example: 2 })
+  hostDeclined!: number;
 }
 
 export class AdminPaymentStatsDto {

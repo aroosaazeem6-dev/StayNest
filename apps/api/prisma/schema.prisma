@@ -1,14 +1,3 @@
-// =============================================================================
-// StayNest Prisma Schema - Phase 1
-// =============================================================================
-// This schema defines the initial PostgreSQL database structure.
-// The project uses a MODULAR MONOLITH architecture — Prisma is the data layer
-// for the single NestJS application.
-//
-// In Prisma 7, datasource URL is configured in prisma.config.ts, not here.
-// Rating CHECK constraint (1-5) is applied via raw SQL in a migration.
-// =============================================================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -17,9 +6,184 @@ datasource db {
   provider = "postgresql"
 }
 
-// =============================================================================
-// Enums
-// =============================================================================
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  role          UserRole       @default(GUEST)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  isHost        Boolean        @default(false) @map("is_host")
+  bookings      Booking[]
+  favorites     Favorite[]
+  properties    Property[]
+  refreshTokens RefreshToken[]
+  reviewsGiven  Review[]       @relation("GuestReviews")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Property {
+  id            String            @id @default(cuid())
+  hostId        String            @map("host_id")
+  title         String
+  description   String?
+  propertyType  PropertyType      @map("property_type")
+  address       String?
+  city          String?
+  state         String?
+  country       String?
+  latitude      Float?
+  longitude     Float?
+  pricePerNight Decimal           @map("price_per_night") @db.Decimal(10, 2)
+  maxGuests     Int               @map("max_guests")
+  bedrooms      Int?
+  bathrooms     Float?
+  status        PropertyStatus    @default(DRAFT)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  availability  Availability[]
+  bookings      Booking[]
+  favorites     Favorite[]
+  host          User              @relation(fields: [hostId], references: [id])
+  amenities     PropertyAmenity[]
+  images        PropertyImage[]
+  reviews       Review[]
+
+  @@index([hostId])
+  @@index([status])
+  @@map("properties")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String   @map("property_id")
+  objectKey  String   @map("object_key")
+  url        String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@map("property_images")
+}
+
+model Amenity {
+  id                String            @id @default(cuid())
+  name              String            @unique
+  propertyAmenities PropertyAmenity[]
+
+  @@map("amenities")
+}
+
+model PropertyAmenity {
+  propertyId String   @map("property_id")
+  amenityId  String   @map("amenity_id")
+  amenity    Amenity  @relation(fields: [amenityId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@id([propertyId, amenityId])
+  @@index([amenityId])
+  @@map("property_amenities")
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  propertyId  String   @map("property_id")
+  date        DateTime @db.Date
+  isAvailable Boolean  @default(true) @map("is_available")
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([propertyId, date])
+  @@index([propertyId])
+  @@map("availability")
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  propertyId  String        @map("property_id")
+  guestId     String        @map("guest_id")
+  checkIn     DateTime      @map("check_in")
+  checkOut    DateTime      @map("check_out")
+  guests      Int
+  status      BookingStatus @default(PENDING)
+  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  guest       User          @relation(fields: [guestId], references: [id])
+  property    Property      @relation(fields: [propertyId], references: [id])
+  payment     Payment?
+  review      Review?
+
+  @@index([propertyId])
+  @@index([guestId])
+  @@index([status])
+  @@index([checkIn])
+  @@index([checkOut])
+  @@map("bookings")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  bookingId         String        @unique @map("booking_id")
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("usd")
+  status            PaymentStatus @default(PENDING)
+  provider          String?
+  providerReference String?       @map("provider_reference")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  booking           Booking       @relation(fields: [bookingId], references: [id])
+
+  @@index([status])
+  @@map("payments")
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  propertyId String   @map("property_id")
+  guestId    String   @map("guest_id")
+  bookingId  String   @unique @map("booking_id")
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  guest      User     @relation("GuestReviews", fields: [guestId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+  @@index([guestId])
+  @@map("reviews")
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  guestId    String   @map("guest_id")
+  propertyId String   @map("property_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  guest      User     @relation(fields: [guestId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([guestId, propertyId])
+  @@index([guestId])
+  @@map("favorites")
+}
 
 enum UserRole {
   GUEST
@@ -57,208 +221,4 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
-}
-
-// =============================================================================
-// Models
-// =============================================================================
-
-model User {
-  id           String   @id @default(cuid())
-  name         String
-  email        String   @unique
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(GUEST)
-  isHost       Boolean  @default(false) @map("is_host")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  properties    Property[]
-  bookings      Booking[]
-  reviewsGiven  Review[]       @relation("GuestReviews")
-  favorites     Favorite[]
-  refreshTokens RefreshToken[]
-
-  @@map("users")
-}
-
-model RefreshToken {
-  id         String    @id @default(cuid())
-  userId     String    @map("user_id")
-  tokenHash  String    @unique @map("token_hash")
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  replacedBy String?   @map("replaced_by")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@map("refresh_tokens")
-}
-
-model Property {
-  id             String          @id @default(cuid())
-  hostId         String          @map("host_id")
-  title          String
-  description    String?
-  propertyType   PropertyType    @map("property_type")
-  address        String?
-  city           String?
-  state          String?
-  country        String?
-  latitude       Float?
-  longitude      Float?
-  pricePerNight  Decimal         @map("price_per_night") @db.Decimal(10, 2)
-  maxGuests      Int             @map("max_guests")
-  bedrooms       Int?
-  bathrooms      Float?
-  status         PropertyStatus  @default(DRAFT)
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-
-  // Relations
-  host           User            @relation(fields: [hostId], references: [id])
-  images         PropertyImage[]
-  amenities      PropertyAmenity[]
-  availability   Availability[]
-  bookings       Booking[]
-  reviews        Review[]
-  favorites      Favorite[]
-
-  @@map("properties")
-  @@index([hostId])
-  @@index([status])
-}
-
-model PropertyImage {
-  id          String   @id @default(cuid())
-  propertyId  String   @map("property_id")
-  objectKey   String   @map("object_key")
-  url         String?
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  property    Property @relation(fields: [propertyId], references: [id])
-
-  @@map("property_images")
-  @@index([propertyId])
-}
-
-model Amenity {
-  id                String             @id @default(cuid())
-  name              String             @unique
-
-  // Relations
-  propertyAmenities PropertyAmenity[]
-
-  @@map("amenities")
-}
-
-model PropertyAmenity {
-  propertyId String @map("property_id")
-  amenityId  String @map("amenity_id")
-
-  // Relations
-  property   Property @relation(fields: [propertyId], references: [id])
-  amenity    Amenity  @relation(fields: [amenityId], references: [id])
-
-  @@map("property_amenities")
-  @@id([propertyId, amenityId])
-  @@index([amenityId])
-}
-
-model Availability {
-  id           String   @id @default(cuid())
-  propertyId   String   @map("property_id")
-  date         DateTime @db.Date
-  isAvailable  Boolean  @default(true) @map("is_available")
-
-  // Relations
-  property     Property @relation(fields: [propertyId], references: [id])
-
-  @@map("availability")
-  @@index([propertyId])
-  @@unique([propertyId, date])
-}
-
-model Booking {
-  id          String        @id @default(cuid())
-  propertyId  String        @map("property_id")
-  guestId     String        @map("guest_id")
-  checkIn     DateTime      @map("check_in")
-  checkOut    DateTime      @map("check_out")
-  guests      Int
-  status      BookingStatus @default(PENDING)
-  totalAmount Decimal       @map("total_amount") @db.Decimal(10, 2)
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
-
-  // Relations
-  property    Property      @relation(fields: [propertyId], references: [id])
-  guest       User          @relation(fields: [guestId], references: [id])
-  payment     Payment?
-  review      Review?
-
-  @@map("bookings")
-  @@index([propertyId])
-  @@index([guestId])
-  @@index([status])
-  @@index([checkIn])
-  @@index([checkOut])
-}
-
-model Payment {
-  id                 String        @id @default(cuid())
-  bookingId          String        @unique @map("booking_id")
-  amount             Decimal       @db.Decimal(10, 2)
-  currency           String        @default("usd")
-  status             PaymentStatus @default(PENDING)
-  provider           String?
-  providerReference  String?       @map("provider_reference")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
-
-  // Relations
-  booking            Booking       @relation(fields: [bookingId], references: [id])
-
-  @@map("payments")
-  @@index([status])
-}
-
-model Review {
-  id          String   @id @default(cuid())
-  propertyId  String   @map("property_id")
-  guestId     String   @map("guest_id")
-  bookingId   String   @unique @map("booking_id")
-  rating      Int
-  comment     String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  property    Property @relation(fields: [propertyId], references: [id])
-  guest       User     @relation("GuestReviews", fields: [guestId], references: [id])
-  booking     Booking  @relation(fields: [bookingId], references: [id])
-
-  @@map("reviews")
-  @@index([propertyId])
-  @@index([guestId])
-}
-
-model Favorite {
-  id         String   @id @default(cuid())
-  guestId    String   @map("guest_id")
-  propertyId String   @map("property_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  // Relations
-  guest      User     @relation(fields: [guestId], references: [id])
-  property   Property @relation(fields: [propertyId], references: [id])
-
-  @@map("favorites")
-  @@index([guestId])
-  @@unique([guestId, propertyId])
 }
