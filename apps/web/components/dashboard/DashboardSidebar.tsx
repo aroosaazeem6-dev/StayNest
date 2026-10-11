@@ -170,6 +170,11 @@ export function DashboardSidebar({
       icon: <BookingIcon />,
     },
     {
+      href: '/payments',
+      label: 'Payments',
+      icon: <WalletIcon />,
+    },
+    {
       href: '/favorites',
       label: 'Favorites',
       icon: <HeartIcon />,

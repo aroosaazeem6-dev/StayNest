@@ -61,6 +61,7 @@ function getPageTitle(pathname: string) {
   if (pathname === '/dashboard') return 'Dashboard';
   if (pathname.startsWith('/properties')) return 'Explore Stays';
   if (pathname.startsWith('/bookings')) return 'My Bookings';
+  if (pathname.startsWith('/payments')) return 'Payments';
   if (pathname.startsWith('/favorites')) return 'Favorites';
   if (pathname.startsWith('/host')) return 'Hosting';
   if (pathname.startsWith('/profile')) return 'Profile';
