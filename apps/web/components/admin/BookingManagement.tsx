@@ -9,7 +9,15 @@ import {
   type AdminBookingListResponse,
 } from '@/lib/admin-service';
 
-const STATUSES = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'];
+const STATUSES = [
+  'PENDING',
+  'HOST_ACCEPTED',
+  'HOST_DECLINED',
+  'PAYMENT_REQUIRED',
+  'CONFIRMED',
+  'CANCELLED',
+  'COMPLETED',
+];
 
 export function BookingManagement() {
   const { tokens } = useAuth();
@@ -153,17 +161,31 @@ export function BookingManagement() {
 function StatusSelect({ booking, tokens }: { booking: AdminBooking; tokens: { accessToken?: string } | null }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState(booking.status);
 
-  async function handleChange(newStatus: string) {
-    if (newStatus === booking.status) return;
+  const isHostAccepted = booking.status === 'HOST_ACCEPTED';
+
+  // HOST_ACCEPTED: admin actions (PENDING, CONFIRM, CANCEL)
+  // Other statuses: disabled, show current status as single option for visual continuity
+  const [selectedAction, setSelectedAction] = useState(isHostAccepted ? 'PENDING' : booking.status);
+  const actionOptions = isHostAccepted ? ['PENDING', 'CONFIRM', 'CANCEL'] : [booking.status];
+
+  async function handleAction(action: string) {
+    if (!isHostAccepted) return; // No actions for non-HOST_ACCEPTED
+    if (action === 'PENDING' || action === selectedAction) return;
     const accessToken = tokens?.accessToken;
     if (!accessToken) return;
     setSaving(true);
     setError(null);
     try {
-      const updated = await adminService.updateBookingStatus(accessToken, booking.id, newStatus);
-      setStatus(updated.status);
+      let updated;
+      if (action === 'CONFIRM') {
+        updated = await adminService.adminApproveBooking(accessToken, booking.id);
+      } else if (action === 'CANCEL') {
+        updated = await adminService.adminRejectBooking(accessToken, booking.id);
+      }
+      if (updated) {
+        setSelectedAction('PENDING');
+      }
     } catch (err: unknown) {
       const e = err as { status?: number; message?: string } | undefined;
       setError(e?.message || 'Unable to update status.');
@@ -175,14 +197,14 @@ function StatusSelect({ booking, tokens }: { booking: AdminBooking; tokens: { ac
   return (
     <div>
       <select
-        value={status}
-        onChange={(e) => void handleChange(e.target.value)}
-        disabled={saving}
+        value={selectedAction}
+        onChange={(e) => void handleAction(e.target.value)}
+        disabled={saving || !isHostAccepted}
         className="rounded-lg border border-gray-300 px-2 py-1 text-xs outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
       >
-        {STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {s}
+        {actionOptions.map((a) => (
+          <option key={a} value={a}>
+            {a}
           </option>
         ))}
       </select>

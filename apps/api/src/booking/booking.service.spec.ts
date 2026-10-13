@@ -140,6 +140,7 @@ describe('BookingService', () => {
               in: [
                 BookingStatus.PENDING,
                 BookingStatus.HOST_ACCEPTED,
+                BookingStatus.PAYMENT_REQUIRED,
                 BookingStatus.CONFIRMED,
               ],
             },

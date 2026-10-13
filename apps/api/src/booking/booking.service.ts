@@ -35,9 +35,10 @@ type BookingWithGuestAndProperty = Booking & {
   guest: Pick<User, 'id' | 'name' | 'email'>;
 };
 
-const HOST_BLOCKING_STATUSES = [
+const PAYMENT_BLOCKING_STATUSES = [
   BookingStatus.PENDING,
   BookingStatus.HOST_ACCEPTED,
+  BookingStatus.PAYMENT_REQUIRED,
   BookingStatus.CONFIRMED,
 ];
 
@@ -74,7 +75,7 @@ export class BookingService {
     const overlapping = await this.prisma.booking.findFirst({
       where: {
         propertyId,
-        status: { in: HOST_BLOCKING_STATUSES },
+        status: { in: PAYMENT_BLOCKING_STATUSES },
         checkIn: { lt: checkOutDate },
         checkOut: { gt: checkInDate },
       },
@@ -122,7 +123,7 @@ export class BookingService {
       const overlapping = await tx.booking.findFirst({
         where: {
           propertyId: dto.propertyId,
-          status: { in: HOST_BLOCKING_STATUSES },
+          status: { in: PAYMENT_BLOCKING_STATUSES },
           checkIn: { lt: checkOutDate },
           checkOut: { gt: checkInDate },
         },
@@ -443,6 +444,127 @@ export class BookingService {
     });
 
     return this.toHostResponseDto(updated);
+  }
+
+  /**
+   * Admin approves a HOST_ACCEPTED booking.
+   * Transitions HOST_ACCEPTED → PAYMENT_REQUIRED.
+   * Does NOT transition to CONFIRMED — payment is still required.
+   */
+  async adminApprove(
+    id: string,
+    admin: AuthenticatedUser,
+  ): Promise<BookingResponseDto> {
+    if (admin.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can approve bookings');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.status !== BookingStatus.HOST_ACCEPTED) {
+      throw new BadRequestException(
+        `Booking cannot be approved from status ${booking.status}`,
+      );
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.PAYMENT_REQUIRED },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+          },
+        },
+      },
+    });
+
+    return this.toResponseDto(updated);
+  }
+
+  /**
+   * Admin rejects a HOST_ACCEPTED booking.
+   * Transitions HOST_ACCEPTED → CANCELLED (terminal, no payment possible).
+   */
+  async adminReject(
+    id: string,
+    admin: AuthenticatedUser,
+  ): Promise<BookingResponseDto> {
+    if (admin.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only admins can reject bookings');
+    }
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (booking.status !== BookingStatus.HOST_ACCEPTED) {
+      throw new BadRequestException(
+        `Booking cannot be rejected from status ${booking.status}`,
+      );
+    }
+
+    const updated = await this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.CANCELLED },
+      include: {
+        property: {
+          select: {
+            id: true,
+            title: true,
+            propertyType: true,
+            city: true,
+            country: true,
+            pricePerNight: true,
+            hostId: true,
+          },
+        },
+      },
+    });
+
+    return this.toResponseDto(updated);
   }
 
   async findOne(

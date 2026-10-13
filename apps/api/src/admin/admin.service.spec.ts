@@ -556,17 +556,24 @@ beforeEach(async () => {
     expect(result.status).toBe('CANCELLED');
   });
 
-  it('allows HOST_ACCEPTED -> CONFIRMED transition', async () => {
-    prisma.booking.findUnique.mockResolvedValue({
-      id: 'bk-1',
-      status: 'HOST_ACCEPTED',
-      totalAmount: 1000,
+    it('allows HOST_ACCEPTED -> PAYMENT_REQUIRED transition', async () => {
+      prisma.booking.findUnique.mockResolvedValue({
+        id: 'bk-1',
+        status: 'HOST_ACCEPTED',
+        totalAmount: 1000,
+      });
+
+      await service.updateBookingStatus('bk-1', {
+        status: 'PAYMENT_REQUIRED' as any,
+      });
+
+      expect(prisma.booking.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'bk-1' },
+          data: { status: 'PAYMENT_REQUIRED' },
+        }),
+      );
     });
-    const result = await service.updateBookingStatus('bk-1', {
-      status: 'CONFIRMED' as any,
-    });
-    expect(result.status).toBe('CANCELLED');
-  });
 
   it('throws NotFoundException for nonexistent booking on status update', async () => {
     prisma.booking.findUnique.mockResolvedValue(null);

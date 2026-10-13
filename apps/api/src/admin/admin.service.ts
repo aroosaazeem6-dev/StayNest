@@ -517,10 +517,11 @@ export class AdminService {
         BookingStatus.CANCELLED,
       ],
       [BookingStatus.HOST_ACCEPTED]: [
-        BookingStatus.CONFIRMED,
+        BookingStatus.PAYMENT_REQUIRED,
         BookingStatus.CANCELLED,
       ],
       [BookingStatus.HOST_DECLINED]: [BookingStatus.CANCELLED],
+      [BookingStatus.PAYMENT_REQUIRED]: [BookingStatus.CONFIRMED, BookingStatus.CANCELLED],
       [BookingStatus.CONFIRMED]: [BookingStatus.COMPLETED, BookingStatus.CANCELLED],
       [BookingStatus.CANCELLED]: [],
       [BookingStatus.COMPLETED]: [],

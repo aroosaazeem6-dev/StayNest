@@ -256,6 +256,28 @@ export const adminService = {
     );
   },
 
+  async adminApproveBooking(
+    accessToken: string,
+    id: string,
+  ): Promise<AdminBooking> {
+    return apiClient.request<AdminBooking>(
+      `/bookings/${id}/admin-approve`,
+      { method: 'PATCH' },
+      accessToken,
+    );
+  },
+
+  async adminRejectBooking(
+    accessToken: string,
+    id: string,
+  ): Promise<AdminBooking> {
+    return apiClient.request<AdminBooking>(
+      `/bookings/${id}/admin-reject`,
+      { method: 'PATCH' },
+      accessToken,
+    );
+  },
+
   async listPayments(
     accessToken: string,
     query: { page?: number; limit?: number; status?: string },

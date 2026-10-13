@@ -141,4 +141,47 @@ export class BookingController {
   ): Promise<HostBookingResponseDto> {
     return this.bookingService.hostDecline(id, host);
   }
+
+  @Patch(':id/admin-approve')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Admin approve a HOST_ACCEPTED booking → PAYMENT_REQUIRED',
+    description:
+      'Only HOST_ACCEPTED bookings can be approved. ' +
+      'Approval transitions the booking to PAYMENT_REQUIRED — it does NOT confirm the booking. ' +
+      'Payment must be completed before the booking is CONFIRMED.',
+  })
+  @ApiResponse({ status: 200, type: BookingResponseDto })
+  @ApiResponse({ status: 400, description: 'Booking is not in HOST_ACCEPTED status' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  @ApiResponse({ status: 403, description: 'Insufficient role (ADMIN required)' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async adminApprove(
+    @Param('id') id: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ): Promise<BookingResponseDto> {
+    return this.bookingService.adminApprove(id, admin);
+  }
+
+  @Patch(':id/admin-reject')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Admin reject a HOST_ACCEPTED booking → CANCELLED',
+    description:
+      'Only HOST_ACCEPTED bookings can be rejected. ' +
+      'Rejection transitions the booking to CANCELLED (terminal, no payment possible).',
+  })
+  @ApiResponse({ status: 200, type: BookingResponseDto })
+  @ApiResponse({ status: 400, description: 'Booking is not in HOST_ACCEPTED status' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid access token' })
+  @ApiResponse({ status: 403, description: 'Insufficient role (ADMIN required)' })
+  @ApiResponse({ status: 404, description: 'Booking not found' })
+  async adminReject(
+    @Param('id') id: string,
+    @CurrentUser() admin: AuthenticatedUser,
+  ): Promise<BookingResponseDto> {
+    return this.bookingService.adminReject(id, admin);
+  }
 }

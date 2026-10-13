@@ -222,6 +222,36 @@ export const bookingService = {
       accessToken,
     );
   },
+
+  /**
+   * Admin approve a HOST_ACCEPTED booking → PAYMENT_REQUIRED.
+   * Endpoint: PATCH /api/v1/bookings/:id/admin-approve (ADMIN only)
+   * Only HOST_ACCEPTED bookings can be approved.
+   */
+  async adminApprove(id: string, accessToken: string): Promise<Booking> {
+    return apiClient.request<Booking>(
+      `/bookings/${id}/admin-approve`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+  },
+
+  /**
+   * Admin reject a HOST_ACCEPTED booking → CANCELLED.
+   * Endpoint: PATCH /api/v1/bookings/:id/admin-reject (ADMIN only)
+   * Only HOST_ACCEPTED bookings can be rejected.
+   */
+  async adminReject(id: string, accessToken: string): Promise<Booking> {
+    return apiClient.request<Booking>(
+      `/bookings/${id}/admin-reject`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+  },
 };
 
 export default bookingService;
